@@ -4,8 +4,9 @@ This guide explains how to deploy the Science Fair Robot as a Docker container o
 
 ## Prerequisites
 
-- Duckiebot running with ROS (typically ROS Noetic or ROS Kinetic)
+- Duckiebot running with ROS (Ubuntu 18.04 with ROS Melodic, or Ubuntu 20.04 with ROS Noetic)
 - Docker installed on the robot
+- ARM64 architecture (tested on Jetson Nano with Ubuntu 18.04.6)
 - Access to the robot via SSH or direct terminal
 - ROS master running on the robot
 

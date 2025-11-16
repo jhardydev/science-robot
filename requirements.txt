@@ -3,8 +3,9 @@ mediapipe>=0.10.0
 numpy>=1.24.0
 
 # ROS dependencies (install via apt-get, not pip):
-# sudo apt-get install ros-<distro>-rospy ros-<distro>-duckietown-msgs ros-<distro>-cv-bridge ros-<distro>-sensor-msgs ros-<distro>-std-msgs
-# For example, on ROS Noetic:
+# Ubuntu 18.04 uses ROS Melodic:
+# sudo apt-get install ros-melodic-rospy ros-melodic-duckietown-msgs ros-melodic-cv-bridge ros-melodic-sensor-msgs ros-melodic-std-msgs
+# Ubuntu 20.04 uses ROS Noetic:
 # sudo apt-get install ros-noetic-rospy ros-noetic-duckietown-msgs ros-noetic-cv-bridge ros-noetic-sensor-msgs ros-noetic-std-msgs
 
 # NVIDIA libraries (typically included with JetPack/Duckietown containers):

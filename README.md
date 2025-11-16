@@ -20,9 +20,10 @@ A gesture-controlled robot that detects waving children, steers toward them, and
 
 ## Software Requirements
 
-- ROS (Noetic or Kinetic)
+- ROS Melodic (Ubuntu 18.04) or ROS Noetic (Ubuntu 20.04)
 - Python 3.6+
 - Docker (for containerized deployment)
+- ARM64 architecture (tested on Jetson Nano with Ubuntu 18.04)
 
 ## Quick Start with Docker (Recommended)
 
@@ -47,9 +48,10 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
 
 3. **Install ROS dependencies** (on robot):
    ```bash
+   # For Ubuntu 18.04 (ROS Melodic):
+   sudo apt-get install ros-melodic-rospy ros-melodic-duckietown-msgs ros-melodic-cv-bridge ros-melodic-sensor-msgs ros-melodic-std-msgs
+   # Or for Ubuntu 20.04 (ROS Noetic):
    sudo apt-get install ros-noetic-rospy ros-noetic-duckietown-msgs ros-noetic-cv-bridge ros-noetic-sensor-msgs ros-noetic-std-msgs
-   # Or for ROS Kinetic:
-   sudo apt-get install ros-kinetic-rospy ros-kinetic-duckietown-msgs ros-kinetic-cv-bridge ros-kinetic-sensor-msgs ros-kinetic-std-msgs
    ```
 
 4. **Configure settings** in `config.py`:

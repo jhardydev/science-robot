@@ -1,7 +1,8 @@
 # Dockerfile for Duckiebot Science Fair Robot
 # Uses Duckietown ROS commons base image for compatibility
+# For Ubuntu 18.04 ARM (ROS Melodic)
 
-FROM duckietown/dt-ros-commons:daffy-amd64
+FROM duckietown/dt-ros-commons:daffy-arm64
 
 # Set working directory
 WORKDIR /code
@@ -24,18 +25,13 @@ COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Install ROS dependencies (duckietown-msgs should be in base image, but ensure they're there)
+# Ubuntu 18.04 uses ROS Melodic
 RUN apt-get update && apt-get install -y \
-    ros-noetic-rospy \
-    ros-noetic-duckietown-msgs \
-    ros-noetic-cv-bridge \
-    ros-noetic-sensor-msgs \
-    ros-noetic-std-msgs \
-    || (apt-get update && apt-get install -y \
-        ros-kinetic-rospy \
-        ros-kinetic-duckietown-msgs \
-        ros-kinetic-cv-bridge \
-        ros-kinetic-sensor-msgs \
-        ros-kinetic-std-msgs) \
+    ros-melodic-rospy \
+    ros-melodic-duckietown-msgs \
+    ros-melodic-cv-bridge \
+    ros-melodic-sensor-msgs \
+    ros-melodic-std-msgs \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
