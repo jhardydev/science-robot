@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# ROS
+devel/
+.catkin_workspace
+build_isolated/
+devel_isolated/
+install_isolated/
+
+# Large model files (uncomment if needed)
+# resources/models/*.pb
+# resources/models/*.h5
+# resources/models/*.onnx
+# *.mp4
+# *.avi
+
+# Docker volumes and temporary files
+*.log
+docker-compose.override.yml
+
+# Environment variables
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
