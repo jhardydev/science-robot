@@ -1,41 +1,61 @@
 #!/bin/bash
 # Entrypoint script for Duckiebot Science Fair Robot container
 
-set -e
+# Don't exit on error - let the Python script handle errors
+# set -e
 
 # Source Duckietown environment (should be in base image)
 if [ -f /environment.sh ]; then
-    source /environment.sh
+    echo "Sourcing Duckietown environment..."
+    source /environment.sh || echo "Warning: Failed to source /environment.sh"
 fi
 
 # Source ROS Noetic setup (daffy-arm64v8 uses Noetic)
 if [ -f /opt/ros/noetic/setup.bash ]; then
-    source /opt/ros/noetic/setup.bash
+    echo "Sourcing ROS Noetic setup..."
+    source /opt/ros/noetic/setup.bash || echo "Warning: Failed to source ROS Noetic"
+else
+    echo "Warning: /opt/ros/noetic/setup.bash not found"
 fi
 
 # Ensure ROS master is set (default to localhost if not provided)
 if [ -z "$ROS_MASTER_URI" ]; then
     export ROS_MASTER_URI=http://localhost:11311
+    echo "Using default ROS_MASTER_URI: $ROS_MASTER_URI"
+else
+    echo "Using ROS_MASTER_URI: $ROS_MASTER_URI"
 fi
 
 # Set ROS hostname if not set
 if [ -z "$ROS_HOSTNAME" ]; then
     export ROS_HOSTNAME=$(hostname)
 fi
+echo "ROS_HOSTNAME: $ROS_HOSTNAME"
 
 # Wait for ROS master to be available (since ros container uses host network)
 echo "Waiting for ROS master at $ROS_MASTER_URI..."
 timeout=30
 elapsed=0
-while ! rostopic list > /dev/null 2>&1; do
-    if [ $elapsed -ge $timeout ]; then
-        echo "Warning: ROS master not available after ${timeout}s, proceeding anyway..."
+ROS_AVAILABLE=false
+
+while [ $elapsed -lt $timeout ]; do
+    if rostopic list > /dev/null 2>&1; then
+        echo "ROS master is available!"
+        ROS_AVAILABLE=true
+        rostopic list | head -5
         break
     fi
+    echo "  Waiting for ROS master... (${elapsed}/${timeout}s)"
     sleep 1
     elapsed=$((elapsed + 1))
 done
 
+if [ "$ROS_AVAILABLE" = false ]; then
+    echo "WARNING: ROS master not available after ${timeout}s, proceeding anyway..."
+    echo "The application may fail if ROS topics are not accessible."
+fi
+
 # Execute the command
+echo "Starting application: $@"
 exec "$@"
 
