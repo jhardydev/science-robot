@@ -4,19 +4,10 @@
 # Don't exit on error - let the Python script handle errors
 # set -e
 
-# Source Duckietown environment (should already be sourced by base image entrypoint)
-# The base image's entrypoint.sh already sources /environment.sh, so we skip it
-# Check if Duckietown environment variables are already set
-if [ -z "$DUCKIETOWN_ROOT" ] && [ -z "$DUCKIETOWN_SHELL" ]; then
-    # Only source if not already sourced
-    if [ -f /environment.sh ] && [ -z "$DUCKIETOWN_ENV_SOURCED" ]; then
-        echo "Sourcing Duckietown environment (not already sourced)..."
-        export DUCKIETOWN_ENV_SOURCED=1
-        source /environment.sh 2>/dev/null || echo "Warning: Failed to source /environment.sh"
-    fi
-else
-    echo "Duckietown environment already sourced (DUCKIETOWN_ROOT or DUCKIETOWN_SHELL is set)"
-fi
+# Skip sourcing /environment.sh - the Duckietown base image entrypoint already does this
+# Sourcing it again causes infinite loops since /environment.sh may source our entrypoint
+# The environment should already be set up when this script runs
+echo "Duckietown environment should already be sourced by base image entrypoint"
 
 # Source ROS Noetic setup (daffy-arm64v8 uses Noetic)
 if [ -f /opt/ros/noetic/setup.bash ]; then
