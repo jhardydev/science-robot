@@ -216,6 +216,43 @@ If you want to see the camera feed with overlays:
 
 3. Verify motor topic name in config matches your setup
 
+### Duckietown Messages Not Found
+
+**Problem**: Container build or run fails with "No module named 'duckietown_msgs'" or similar errors.
+
+**Solutions**:
+
+1. **Install duckietown-msgs in container** (if available via apt):
+   ```bash
+   # The Dockerfile attempts this automatically
+   # If it fails, you may need to add Duckietown apt repository first
+   ```
+
+2. **Mount host ROS workspace** (if duckietown-msgs is built on host):
+   ```bash
+   # Find where duckietown-msgs is installed on host
+   rospack find duckietown_msgs
+   
+   # Mount it in docker-compose.yml or docker run command
+   # Add to docker-compose.yml volumes:
+   - /opt/ros/melodic/share:/opt/ros/melodic/share:ro
+   # Or mount specific workspace
+   - ~/catkin_ws/devel/lib/python3/dist-packages:/opt/ros/melodic/lib/python3/dist-packages:ro
+   ```
+
+3. **Build duckietown-msgs in container** (from source):
+   ```bash
+   # Add to Dockerfile before Python dependencies:
+   # Build duckietown-msgs from source (requires Duckietown repo)
+   ```
+
+4. **Use host ROS environment directly** (skip container for now):
+   ```bash
+   # Run without Docker until duckietown-msgs is resolved
+   pip3 install -r requirements.txt
+   python3 main.py
+   ```
+
 ### Performance Issues
 
 **Problem**: Low FPS or laggy performance.
