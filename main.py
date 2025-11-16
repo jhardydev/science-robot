@@ -4,6 +4,11 @@ Duckiebot Science Fair Robot - Main Control Loop
 Detects waving, steers toward wavers, performs dance on gesture, and handles treat dispensing
 Enhanced with NVIDIA GPU acceleration and ROS integration
 """
+# Set matplotlib backend before any imports that might use it
+# MediaPipe imports matplotlib, which needs a non-GUI backend in containers
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend for headless environments
+
 import rospy
 import cv2
 import time
