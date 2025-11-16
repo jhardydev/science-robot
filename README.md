@@ -77,6 +77,11 @@ Edit `config.py` to adjust:
 ### Running in Container (Recommended)
 
 ```bash
+# Build and run
+./docker-run.sh --build
+
+# Clean up before running (if needed)
+./docker-cleanup.sh --all --force
 ./docker-run.sh --build
 ```
 
@@ -114,6 +119,7 @@ science-robot/
 ├── docker-compose.yml      # Docker Compose configuration
 ├── docker-entrypoint.sh    # Container entrypoint script
 ├── docker-run.sh           # Helper script for building/running
+├── docker-cleanup.sh       # Cleanup script for development
 ├── DEPLOYMENT.md           # Detailed deployment guide
 ├── src/
 │   ├── camera.py          # ROS camera subscriber

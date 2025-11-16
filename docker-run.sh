@@ -28,6 +28,12 @@ while [[ $# -gt 0 ]]; do
             BUILD=true
             shift
             ;;
+        --cleanup)
+            # Run cleanup script
+            SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+            "$SCRIPT_DIR/docker-cleanup.sh" --all --force
+            exit 0
+            ;;
         --help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -35,11 +41,13 @@ while [[ $# -gt 0 ]]; do
             echo "  --robot-name NAME    Set robot name (default: robot1)"
             echo "  --ros-master URI     Set ROS master URI (default: http://localhost:11311)"
             echo "  --build              Build image before running"
+            echo "  --cleanup            Clean up containers, images, and volumes (then exit)"
             echo "  --help               Show this help message"
             echo ""
             echo "Examples:"
             echo "  $0 --build"
             echo "  $0 --robot-name duckiebot --ros-master http://192.168.1.100:11311"
+            echo "  $0 --cleanup          # Clean up everything before running"
             exit 0
             ;;
         *)

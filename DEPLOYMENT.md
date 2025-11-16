@@ -265,6 +265,81 @@ docker stop science-robot
 # The helper script uses --rm, so container is auto-removed on exit
 ```
 
+## Cleanup
+
+For development environments, it's easy to clean up after failed attempts or when starting fresh.
+
+### Quick Cleanup
+
+```bash
+# Clean up everything (containers, images, volumes)
+./docker-cleanup.sh --all
+
+# Clean up with auto-confirmation (no prompts)
+./docker-cleanup.sh --all --force
+
+# Clean up using docker-run.sh
+./docker-run.sh --cleanup
+```
+
+### Selective Cleanup
+
+```bash
+# Remove stopped containers only (default)
+./docker-cleanup.sh
+
+# Remove Docker image only
+./docker-cleanup.sh --image
+
+# Remove containers and image
+./docker-cleanup.sh --containers --image
+
+# Remove everything including volumes
+./docker-cleanup.sh --all
+```
+
+### Manual Cleanup
+
+```bash
+# Stop and remove container
+docker stop science-robot 2>/dev/null || true
+docker rm science-robot 2>/dev/null || true
+
+# Remove image
+docker rmi science-robot:latest 2>/dev/null || true
+
+# Remove dangling images (optional)
+docker image prune -f
+
+# Remove volumes (if any)
+docker volume ls | grep science-robot | awk '{print $2}' | xargs docker volume rm 2>/dev/null || true
+```
+
+### Common Cleanup Scenarios
+
+**After a failed build:**
+```bash
+# Clean up and rebuild
+./docker-cleanup.sh --image --force
+./docker-run.sh --build
+```
+
+**Starting fresh:**
+```bash
+# Remove everything and start clean
+./docker-cleanup.sh --all --force
+./docker-run.sh --build
+```
+
+**Quick reset during development:**
+```bash
+# Stop current container and remove image for rebuild
+docker stop science-robot 2>/dev/null || true
+docker rm science-robot 2>/dev/null || true
+docker rmi science-robot:latest 2>/dev/null || true
+./docker-run.sh --build
+```
+
 ## Integration with Duckietown Stack
 
 This container integrates with the Duckietown ROS ecosystem:
