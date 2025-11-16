@@ -1,8 +1,8 @@
 # Dockerfile for Duckiebot Science Fair Robot
-# For Ubuntu 18.04 ARM64 (ROS Melodic)
+# For Ubuntu 20.04 ARM64 (ROS Noetic)
 # Uses Duckietown ROS commons base image
 
-FROM duckietown/dt-ros-commons:ente
+FROM duckietown/dt-ros-commons:daffy-arm64v8
 
 # Set working directory
 WORKDIR /code

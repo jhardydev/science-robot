@@ -8,9 +8,9 @@ if [ -f /environment.sh ]; then
     source /environment.sh
 fi
 
-# Source ROS Melodic setup as fallback
-if [ -f /opt/ros/melodic/setup.bash ]; then
-    source /opt/ros/melodic/setup.bash
+# Source ROS Noetic setup (daffy-arm64v8 uses Noetic)
+if [ -f /opt/ros/noetic/setup.bash ]; then
+    source /opt/ros/noetic/setup.bash
 fi
 
 # Ensure ROS master is set (default to localhost if not provided)
@@ -23,7 +23,7 @@ if [ -z "$ROS_HOSTNAME" ]; then
     export ROS_HOSTNAME=$(hostname)
 fi
 
-# Wait for ROS master to be available
+# Wait for ROS master to be available (since ros container uses host network)
 echo "Waiting for ROS master at $ROS_MASTER_URI..."
 timeout=30
 elapsed=0
