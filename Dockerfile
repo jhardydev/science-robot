@@ -25,8 +25,11 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip3 install --no-cache-dir -r requirements.txt
+# Install Python dependencies with increased timeout and retry logic
+# Large packages like opencv-python can timeout, so we increase timeout and retry
+RUN pip3 install --no-cache-dir --default-timeout=300 --retries=3 \
+    --upgrade pip setuptools wheel && \
+    pip3 install --no-cache-dir --default-timeout=300 --retries=3 -r requirements.txt
 
 # Copy application code
 COPY . .
