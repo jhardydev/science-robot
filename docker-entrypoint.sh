@@ -3,14 +3,14 @@
 
 set -e
 
-# Source ROS Melodic setup
-if [ -f /opt/ros/melodic/setup.bash ]; then
-    source /opt/ros/melodic/setup.bash
-fi
-
-# Source Duckietown environment if available (from host or container)
+# Source Duckietown environment (should be in base image)
 if [ -f /environment.sh ]; then
     source /environment.sh
+fi
+
+# Source ROS Melodic setup as fallback
+if [ -f /opt/ros/melodic/setup.bash ]; then
+    source /opt/ros/melodic/setup.bash
 fi
 
 # Ensure ROS master is set (default to localhost if not provided)
@@ -22,10 +22,6 @@ fi
 if [ -z "$ROS_HOSTNAME" ]; then
     export ROS_HOSTNAME=$(hostname)
 fi
-
-# Note: duckietown-msgs needs to be available either:
-# 1. Installed in container (if available)
-# 2. Or accessible via ROS_MASTER_URI (when connecting to host ROS)
 
 # Wait for ROS master to be available
 echo "Waiting for ROS master at $ROS_MASTER_URI..."
