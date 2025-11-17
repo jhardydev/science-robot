@@ -17,6 +17,24 @@ else
     echo "Warning: /opt/ros/noetic/setup.bash not found"
 fi
 
+# Source Duckietown workspace to make duckietown_msgs available
+# The base image has the workspace at /code/catkin_ws
+if [ -f /code/catkin_ws/devel/setup.bash ]; then
+    echo "Sourcing Duckietown workspace..."
+    source /code/catkin_ws/devel/setup.bash || echo "Warning: Failed to source workspace"
+elif [ -f /code/catkin_ws/install/setup.bash ]; then
+    echo "Sourcing Duckietown workspace (install space)..."
+    source /code/catkin_ws/install/setup.bash || echo "Warning: Failed to source workspace"
+else
+    echo "Warning: Duckietown workspace setup.bash not found"
+    echo "Attempting to add workspace to PYTHONPATH manually..."
+    # Add workspace Python packages to PYTHONPATH as fallback
+    if [ -d /code/catkin_ws/devel/lib/python3/dist-packages ]; then
+        export PYTHONPATH="/code/catkin_ws/devel/lib/python3/dist-packages:$PYTHONPATH"
+        echo "Added /code/catkin_ws/devel/lib/python3/dist-packages to PYTHONPATH"
+    fi
+fi
+
 # Ensure ROS master is set (default to localhost if not provided)
 if [ -z "$ROS_MASTER_URI" ]; then
     export ROS_MASTER_URI=http://localhost:11311
