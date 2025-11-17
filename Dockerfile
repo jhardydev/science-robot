@@ -43,10 +43,29 @@ RUN python3 -c "import vpi" 2>/dev/null && echo "VPI is available" || \
 COPY requirements.txt .
 
 # Install Python dependencies with increased timeout and retry logic
-# Large packages like opencv-python can timeout, so we increase timeout and retry
-RUN pip3 install --no-cache-dir --default-timeout=300 --retries=3 \
-    --upgrade pip setuptools wheel && \
-    pip3 install --no-cache-dir --default-timeout=300 --retries=3 -r requirements.txt
+# Large packages like opencv-python and mediapipe can timeout, so we increase timeout significantly
+# Split installation to allow better retry handling
+
+# Upgrade pip, setuptools, wheel first
+RUN pip3 install --no-cache-dir --default-timeout=600 --retries=5 \
+    --upgrade pip setuptools wheel
+
+# Install numpy first (small, required by others)
+RUN pip3 install --no-cache-dir --default-timeout=600 --retries=5 \
+    numpy>=1.24.0
+
+# Install opencv-python (large but usually reliable)
+RUN pip3 install --no-cache-dir --default-timeout=600 --retries=5 \
+    opencv-python>=4.8.0 || \
+    pip3 install --no-cache-dir --default-timeout=900 --retries=10 \
+    opencv-python>=4.8.0
+
+# Install mediapipe (large and can be flaky - give it extra time/retries)
+RUN pip3 install --no-cache-dir --default-timeout=900 --retries=10 \
+    mediapipe>=0.10.0 || \
+    (echo "MediaPipe installation failed, retrying with longer timeout..." && \
+     pip3 install --no-cache-dir --default-timeout=1200 --retries=15 \
+     mediapipe>=0.10.0)
 
 # Copy application code
 COPY . .
