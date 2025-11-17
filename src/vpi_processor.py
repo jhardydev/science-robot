@@ -9,7 +9,14 @@ logger = logging.getLogger(__name__)
 
 try:
     import vpi
-    VPI_AVAILABLE = True
+    # Verify VPI is actually functional, not just importable
+    try:
+        # Try to access a basic VPI attribute to verify it's working
+        _ = vpi.Backend.CUDA if hasattr(vpi, 'Backend') else None
+        VPI_AVAILABLE = True
+    except (AttributeError, Exception):
+        # VPI module exists but may not be functional
+        VPI_AVAILABLE = False
 except ImportError:
     VPI_AVAILABLE = False
     # Don't log here - logger may not be configured yet
@@ -68,7 +75,13 @@ class VPIProcessor:
                 actual_backend = 'CUDA' if backend_upper == 'GPU' else backend_upper
                 logger.info(f"VPI processor initialized with {actual_backend} backend")
         else:
-            logger.warning("VPI processor unavailable - using CPU fallback. Install JetPack for VPI support.")
+            # Provide more helpful diagnostic information
+            import sys
+            python_paths = '\n'.join(sys.path[:5])  # Show first 5 paths
+            logger.warning("VPI processor unavailable - using CPU fallback.")
+            logger.debug(f"Python path: {python_paths}")
+            logger.debug("VPI is typically part of NVIDIA JetPack SDK on Jetson devices.")
+            logger.debug("If running on Jetson, ensure JetPack is installed and VPI libraries are accessible.")
             self.vpi_backend = None
     
     def resize_gpu(self, image, target_width, target_height):

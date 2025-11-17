@@ -12,7 +12,7 @@ EMERGENCY_STOP_TOPIC = f'/{ROBOT_NAME}/wheels_driver_node/emergency_stop'
 # Camera settings (for resizing/processing, actual source is ROS topic)
 CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
-CAMERA_FPS = 30
+CAMERA_FPS = 60  # Increased for better responsiveness
 
 # Motor control settings (legacy GPIO settings - not used with ROS)
 # MOTOR_LEFT_PIN1 = 18
@@ -51,7 +51,7 @@ DANCE_DURATION = 5.0  # Total dance duration in seconds
 DANCE_MOVE_DURATION = 1.0  # Duration of each dance move in seconds
 
 # Main loop settings
-MAIN_LOOP_FPS = 30
+MAIN_LOOP_FPS = 60  # Increased frame rate for smoother operation
 # Disable display output by default in container (headless mode)
 # Set to True only if you have X11 forwarding set up or virtual display enabled
 DISPLAY_OUTPUT = os.getenv('DISPLAY_OUTPUT', 'False').lower() == 'true'  # Auto-detect or use env var
