@@ -51,23 +51,39 @@ try:
     vpi_img = vpi.asimage(test_img)
     print("✓ VPI image creation: OK")
     
+    # Check image format
+    print(f"  Image format: {vpi_img.format}")
+    print(f"  Image size: {vpi_img.width}x{vpi_img.height}")
+    
     # Try resize operation - VPI Image has rescale method
+    # Note: rescale() may require specific formats or backends
     resized = None
     try:
-        # Use rescale method on Image object - backend is required
+        # Method 1: Try CUDA backend with original format
         resized = vpi_img.rescale((50, 50), interp=vpi.Interp.LINEAR, backend=vpi.Backend.CUDA)
-        print("✓ VPI resize operation (rescale): OK")
-    except (AttributeError, TypeError) as e1:
+        print("✓ VPI resize operation (rescale with CUDA): OK")
+    except (ValueError, AttributeError, TypeError) as e1:
+        print(f"  CUDA backend failed: {e1}")
         try:
-            # Try with scale factors instead of target size
-            scale_x = 50 / vpi_img.width
-            scale_y = 50 / vpi_img.height
-            resized = vpi_img.rescale((scale_x, scale_y), interp=vpi.Interp.LINEAR, backend=vpi.Backend.CUDA)
-            print("✓ VPI resize operation (rescale with scale factors): OK")
+            # Method 2: Try CPU backend (supports more formats)
+            resized = vpi_img.rescale((50, 50), interp=vpi.Interp.LINEAR, backend=vpi.Backend.CPU)
+            print("✓ VPI resize operation (rescale with CPU): OK")
         except Exception as e2:
-            print(f"✗ VPI resize operation failed: {e1}, {e2}")
-            print("  Note: VPI resize may use a different API")
-            raise
+            print(f"  CPU backend failed: {e2}")
+            try:
+                # Method 3: Convert format first, then rescale
+                if vpi_img.format != vpi.BGR8:
+                    print(f"  Converting format from {vpi_img.format} to BGR8...")
+                    converted_img = vpi_img.convert(vpi.BGR8, backend=vpi.Backend.CUDA)
+                    resized = converted_img.rescale((50, 50), interp=vpi.Interp.LINEAR, backend=vpi.Backend.CUDA)
+                else:
+                    # Format is BGR8, try different backend
+                    resized = vpi_img.rescale((50, 50), interp=vpi.Interp.LINEAR, backend=vpi.Backend.VIC)
+                print("✓ VPI resize operation (with format conversion): OK")
+            except Exception as e3:
+                print(f"✗ VPI resize operation failed: {e1}, {e2}, {e3}")
+                print("  Note: VPI rescale() may not support this image format on available backends")
+                raise
     
     # Convert back to numpy
     result = resized.cpu()

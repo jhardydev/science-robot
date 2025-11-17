@@ -102,20 +102,35 @@ class VPIProcessor:
             try:
                 # Method 1: Use rescale method directly (most direct)
                 # rescale requires backend parameter (mandatory in VPI)
-                # rescale likely takes (width, height) or scale factor
+                # Some formats may not be supported by all backends
                 if hasattr(vpi_img, 'rescale'):
-                    # Try with target size tuple
+                    # Try with target size tuple and requested backend
                     try:
                         resized = vpi_img.rescale((target_width, target_height), 
                                                  interp=vpi.Interp.LINEAR, 
                                                  backend=self.vpi_backend)
+                    except ValueError as format_error:
+                        # Format may not be supported by this backend, try CPU
+                        if 'format' in str(format_error).lower() and self.vpi_backend != vpi.Backend.CPU:
+                            logger.debug(f"Format not supported by {self.backend} backend, trying CPU")
+                            resized = vpi_img.rescale((target_width, target_height), 
+                                                     interp=vpi.Interp.LINEAR, 
+                                                     backend=vpi.Backend.CPU)
+                        else:
+                            raise
                     except (TypeError, AttributeError):
                         # Maybe it takes scale factors instead
                         scale_x = target_width / vpi_img.width
                         scale_y = target_height / vpi_img.height
-                        resized = vpi_img.rescale((scale_x, scale_y), 
-                                                 interp=vpi.Interp.LINEAR, 
-                                                 backend=self.vpi_backend)
+                        try:
+                            resized = vpi_img.rescale((scale_x, scale_y), 
+                                                     interp=vpi.Interp.LINEAR, 
+                                                     backend=self.vpi_backend)
+                        except ValueError:
+                            # Try CPU backend if format error
+                            resized = vpi_img.rescale((scale_x, scale_y), 
+                                                     interp=vpi.Interp.LINEAR, 
+                                                     backend=vpi.Backend.CPU)
                 else:
                     raise AttributeError("rescale method not found")
             except (AttributeError, TypeError) as e1:
