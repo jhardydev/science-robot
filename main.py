@@ -22,21 +22,23 @@ matplotlib.use('Agg')  # Non-interactive backend for headless environments
 os.environ['FONTCONFIG_FILE'] = os.environ.get('FONTCONFIG_FILE', '/etc/fonts/fonts.conf')
 os.environ['FC_DEBUG'] = '0'
 
+# Import config first (needed before other imports)
+import config
+
+# Import standard library modules
 import rospy
 import cv2
 import time
 import signal
-import sys
 import logging
 from datetime import datetime
 import traceback
 import threading
 import queue
 import select
-import config
 
-# Import MediaPipe (which uses matplotlib and triggers font_manager initialization)
-# Keep stderr redirected during this import
+# Import MediaPipe-dependent modules (which uses matplotlib and triggers font_manager initialization)
+# Keep stderr redirected during this import to suppress fontconfig warnings
 from src.camera import Camera
 from src.gesture_detector import GestureDetector
 from src.wave_detector import WaveDetector
@@ -45,12 +47,22 @@ from src.navigation import NavigationController
 from src.dance import DanceController
 from src.treat_dispenser import TreatDispenser
 
+# Conditionally import VPI processor (may use fontconfig too)
+if config.USE_VPI_ACCELERATION:
+    try:
+        from src.vpi_processor import VPIProcessor
+        vpi_processor = VPIProcessor(backend=config.VPI_BACKEND)
+    except ImportError:
+        vpi_processor = None  # Logger not available yet, will log later
+else:
+    vpi_processor = None
+
 # Now restore stderr after all imports that might trigger fontconfig
 os.dup2(_fontconfig_old_stderr, 2)
 os.close(_fontconfig_old_stderr)
 del _fontconfig_fd, _fontconfig_old_stderr
 
-# Setup logging
+# Setup logging (now that stderr is restored)
 os.makedirs(config.LOG_DIR, exist_ok=True)
 log_file = os.path.join(config.LOG_DIR, f'science_robot_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
 
