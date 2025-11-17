@@ -91,20 +91,24 @@ class RobotController:
             # VPI processor for GPU-accelerated preprocessing
             self.vpi_processor = vpi_processor
             
-            # State management
-            self.running = False
-            self.state = 'idle'  # idle, tracking, dancing
-            self.frame_count = 0
-            
-            # Performance monitoring
-            self.frame_times = []
-            self.processing_times = []
-            
-            # Gesture tracking
-            self.last_dance_gesture_time = 0
-            self.last_treat_gesture_time = 0
-            self.current_gesture_hold_time = 0
-            self.current_gesture = None
+        # State management
+        self.running = False
+        self.state = 'idle'  # idle, tracking, dancing
+        self.frame_count = 0
+        
+        # Performance monitoring
+        self.frame_times = []
+        self.processing_times = []
+        
+        # Gesture tracking
+        self.last_dance_gesture_time = 0
+        self.last_treat_gesture_time = 0
+        self.current_gesture_hold_time = 0
+        self.current_gesture = None
+        
+        # Display window state (for X11 initialization)
+        self.display_window_created = False
+        self.display_init_retries = 0
             
             # Keyboard input handling (for headless mode)
             self.input_queue = queue.Queue()
@@ -277,7 +281,39 @@ class RobotController:
                 if config.DISPLAY_OUTPUT:
                     try:
                         self._draw_overlay(frame, mp_results, is_waving, wave_position)
-                        cv2.imshow('Duckiebot Science Fair Robot', frame)
+                        
+                        # On first frame, wait a bit for X11 to fully initialize
+                        # This helps with SSH X11 forwarding where the connection might not be ready immediately
+                        if not self.display_window_created:
+                            if self.frame_count == 1:
+                                logger.debug("Waiting for X11 display to initialize...")
+                                time.sleep(0.3)  # Give X11 a moment to be ready
+                            
+                            # Try to create/show window - may fail on first attempt with X11 forwarding
+                            try:
+                                cv2.imshow('Duckiebot Science Fair Robot', frame)
+                                # Verify window was actually created by trying to get window property
+                                # If waitKey works, the window exists
+                                test_key = cv2.waitKey(1)
+                                if test_key != -1 or cv2.getWindowProperty('Duckiebot Science Fair Robot', cv2.WND_PROP_VISIBLE) >= 0:
+                                    self.display_window_created = True
+                                    logger.debug("Display window created successfully")
+                                else:
+                                    # Window might not be ready yet, retry next frame
+                                    if self.display_init_retries < 10:
+                                        self.display_init_retries += 1
+                                        logger.debug(f"Window not ready yet, retry {self.display_init_retries}/10")
+                            except Exception as window_error:
+                                # Window creation failed, retry with delay
+                                if self.display_init_retries < 10:
+                                    self.display_init_retries += 1
+                                    logger.debug(f"Window creation failed (retry {self.display_init_retries}/10): {window_error}")
+                                    time.sleep(0.1)
+                                else:
+                                    raise  # Re-raise after max retries
+                        else:
+                            # Window already created, normal display
+                            cv2.imshow('Duckiebot Science Fair Robot', frame)
                         
                         # Handle key presses from OpenCV window (if window has focus)
                         key = cv2.waitKey(1) & 0xFF
@@ -293,6 +329,7 @@ class RobotController:
                         logger.warning(f"Display output failed: {e}, disabling display")
                         logger.debug(traceback.format_exc())
                         config.DISPLAY_OUTPUT = False
+                        self.display_window_created = False
                 
                 # Maintain target FPS
                 elapsed = time.time() - loop_start

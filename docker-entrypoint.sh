@@ -130,6 +130,23 @@ elif [ -z "$DISPLAY" ]; then
 else
     # DISPLAY is set (X11 forwarding or local X11)
     echo "Using X11 display: ${DISPLAY}"
+    
+    # Verify X11 connection is ready (for SSH X11 forwarding)
+    if command -v xdpyinfo > /dev/null 2>&1; then
+        echo "Checking X11 connection..."
+        if timeout 2 xdpyinfo > /dev/null 2>&1; then
+            echo "✓ X11 connection is ready"
+        else
+            echo "⚠ X11 connection check timed out (may still work)"
+            # Small delay to let X11 forwarding initialize
+            sleep 1
+        fi
+    else
+        echo "xdpyinfo not available, skipping X11 connection check"
+        # Small delay for X11 forwarding to initialize
+        sleep 0.5
+    fi
+    
     # Note: /tmp/.X11-unix might not exist with SSH X11 forwarding, that's OK
     if [ "$DISPLAY_OUTPUT" != "false" ]; then
         export DISPLAY_OUTPUT=true
