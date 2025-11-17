@@ -84,16 +84,9 @@ logger = logging.getLogger(__name__)
 logger.info(f"Logging initialized. Log file: {log_file}")
 logger.info(f"Log level: {config.LOG_LEVEL}")
 
-# Conditionally import VPI processor
-if config.USE_VPI_ACCELERATION:
-    try:
-        from src.vpi_processor import VPIProcessor
-        vpi_processor = VPIProcessor(backend=config.VPI_BACKEND)
-    except ImportError:
-        logger.warning("VPI not available, continuing without GPU preprocessing")
-        vpi_processor = None
-else:
-    vpi_processor = None
+# Log VPI status if it wasn't loaded during import
+if config.USE_VPI_ACCELERATION and vpi_processor is None:
+    logger.warning("VPI not available, continuing without GPU preprocessing")
 
 
 class RobotController:
