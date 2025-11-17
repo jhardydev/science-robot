@@ -111,20 +111,46 @@ if [ "$USE_VIRTUAL_DISPLAY" = "true" ]; then
         export DISPLAY_OUTPUT=false
         export QT_QPA_PLATFORM=offscreen
     fi
-elif [ -z "$DISPLAY" ] || [ ! -e /tmp/.X11-unix ]; then
-    # No virtual display and no X11 - run headless
-    echo "No display available, running in headless mode"
-    export DISPLAY_OUTPUT=${DISPLAY_OUTPUT:-false}
-    export QT_QPA_PLATFORM=offscreen
+elif [ -z "$DISPLAY" ]; then
+    # No DISPLAY variable set
+    if [ "$DISPLAY_OUTPUT" = "true" ]; then
+        # User requested display output but DISPLAY not set
+        echo "Warning: DISPLAY_OUTPUT=true but DISPLAY is not set"
+        echo "  Make sure you SSH'd with -X or -Y flag"
+        echo "  Or set DISPLAY environment variable"
+        echo "  Falling back to headless mode"
+        export DISPLAY_OUTPUT=false
+        export QT_QPA_PLATFORM=offscreen
+    else
+        # Running in headless mode as expected
+        echo "No display available, running in headless mode"
+        export DISPLAY_OUTPUT=${DISPLAY_OUTPUT:-false}
+        export QT_QPA_PLATFORM=offscreen
+    fi
 else
-    # X11 display available from host
+    # DISPLAY is set (X11 forwarding or local X11)
     echo "Using X11 display: ${DISPLAY}"
-    export DISPLAY_OUTPUT=${DISPLAY_OUTPUT:-false}
+    # Note: /tmp/.X11-unix might not exist with SSH X11 forwarding, that's OK
+    if [ "$DISPLAY_OUTPUT" != "false" ]; then
+        export DISPLAY_OUTPUT=true
+        # Don't set QT_QPA_PLATFORM - let Qt auto-detect (will use xcb)
+        # xcb plugin is available and will work with X11 forwarding
+    else
+        export DISPLAY_OUTPUT=false
+        export QT_QPA_PLATFORM=offscreen
+    fi
 fi
 
 # Set Qt backend based on display availability
+# Only set offscreen if we're truly headless (DISPLAY_OUTPUT=false)
+# If DISPLAY_OUTPUT=true, let Qt auto-detect the platform (xcb should work)
 if [ "$DISPLAY_OUTPUT" = "false" ]; then
+    # Try to use offscreen, but don't fail if it's not available
     export QT_QPA_PLATFORM=offscreen
+else
+    # Display output enabled - unset QT_QPA_PLATFORM to let Qt auto-detect
+    # This will use xcb which is available in the container
+    unset QT_QPA_PLATFORM
 fi
 
 # Execute the command
