@@ -92,9 +92,21 @@ class VPIProcessor:
             # Convert numpy array to VPI image
             vpi_img = vpi.asimage(image)
             
-            # Resize using VPI
-            resized = vpi.resize(vpi_img, (target_width, target_height), 
-                               interp=vpi.Interp.LINEAR, backend=self.vpi_backend)
+            # VPI uses Scale algorithm for resizing
+            # Try different possible API patterns
+            resized = None
+            try:
+                # Try vpi.Scale (algorithm-based API)
+                resized = vpi.Scale(vpi_img, (target_width, target_height), 
+                                   interp=vpi.Interp.LINEAR, backend=self.vpi_backend)
+            except (AttributeError, TypeError):
+                try:
+                    # Try direct resize if available (older API)
+                    resized = vpi.resize(vpi_img, (target_width, target_height), 
+                                       interp=vpi.Interp.LINEAR, backend=self.vpi_backend)
+                except AttributeError:
+                    # VPI resize not available - fall back to CPU
+                    raise AttributeError("VPI resize API not available")
             
             # Convert back to numpy
             return resized.cpu()

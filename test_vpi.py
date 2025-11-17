@@ -51,9 +51,21 @@ try:
     vpi_img = vpi.asimage(test_img)
     print("✓ VPI image creation: OK")
     
-    # Try resize operation
-    resized = vpi.resize(vpi_img, (50, 50), interp=vpi.Interp.LINEAR)
-    print("✓ VPI resize operation: OK")
+    # Try resize operation - VPI uses Scale algorithm
+    resized = None
+    try:
+        # Try vpi.Scale (algorithm-based API)
+        resized = vpi.Scale(vpi_img, (50, 50), interp=vpi.Interp.LINEAR)
+        print("✓ VPI resize operation (Scale): OK")
+    except (AttributeError, TypeError) as e:
+        try:
+            # Try direct resize (older API)
+            resized = vpi.resize(vpi_img, (50, 50), interp=vpi.Interp.LINEAR)
+            print("✓ VPI resize operation (resize): OK")
+        except AttributeError:
+            print(f"✗ VPI resize operation failed: {e}")
+            print("  Note: VPI resize may use a different API")
+            raise
     
     # Convert back to numpy
     result = resized.cpu()
