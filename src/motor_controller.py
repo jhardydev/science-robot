@@ -37,17 +37,40 @@ class MotorController:
         zero_msg.header.stamp = rospy.Time.now()
         zero_msg.vel_left = 0.0
         zero_msg.vel_right = 0.0
-        self.wheels_pub.publish(zero_msg)
         
-        # Give ROS time to establish the connection after first message
-        rospy.sleep(0.2)
+        # Publish multiple times with delays to ensure connection is established
+        # Sometimes ROS needs a few messages to establish the connection
+        for attempt in range(3):
+            self.wheels_pub.publish(zero_msg)
+            rospy.sleep(0.15)  # Give ROS time between publishes
         
-        # NOW check for subscribers (should be accurate after publishing)
-        subscriber_count = self.wheels_pub.get_num_connections()
+        # Give ROS additional time to establish the connection after publishing
+        rospy.sleep(0.3)
+        
+        # Check for subscribers multiple times (ROS connection can be delayed)
+        subscriber_count = 0
+        max_retries = 5
+        for retry in range(max_retries):
+            subscriber_count = self.wheels_pub.get_num_connections()
+            if subscriber_count > 0:
+                break
+            if retry < max_retries - 1:
+                # Publish again and wait
+                self.wheels_pub.publish(zero_msg)
+                rospy.sleep(0.2)
+        
         if subscriber_count == 0:
             rospy.logwarn(f"Motor command topic '{config.MOTOR_TOPIC}' has no subscribers!")
             rospy.logwarn("  Make sure the wheels_driver_node is running")
             rospy.logwarn("  Note: Connection is established when first message is published")
+            # Try to diagnose - check if topic exists at all
+            try:
+                topics = rospy.get_published_topics()
+                topic_found = any(config.MOTOR_TOPIC in topic[0] for topic in topics)
+                if not topic_found:
+                    rospy.logwarn(f"  Topic '{config.MOTOR_TOPIC}' not found in published topics list")
+            except Exception as e:
+                rospy.logdebug(f"Could not check published topics: {e}")
         else:
             rospy.loginfo(f"Motor command topic has {subscriber_count} subscriber(s)")
         
