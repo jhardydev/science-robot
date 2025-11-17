@@ -18,6 +18,9 @@ import os
 import logging
 from datetime import datetime
 import traceback
+import threading
+import queue
+import select
 import config
 
 # Setup logging
@@ -103,6 +106,11 @@ class RobotController:
             self.current_gesture_hold_time = 0
             self.current_gesture = None
             
+            # Keyboard input handling (for headless mode)
+            self.input_queue = queue.Queue()
+            self.input_thread = None
+            self.original_terminal_settings = None
+            
             logger.info("Robot initialized successfully!")
             if self.camera.has_cuda():
                 logger.info("  - CUDA acceleration: Available")
@@ -147,6 +155,66 @@ class RobotController:
         
         return frame
     
+    def _input_thread_func(self):
+        """Thread function to read keyboard input from stdin"""
+        try:
+            # Check if stdin is a TTY (interactive terminal)
+            if not sys.stdin.isatty():
+                return
+            
+            # Read input character by character
+            while self.running:
+                try:
+                    # Use select to check if input is available (non-blocking)
+                    if select.select([sys.stdin], [], [], 0.1)[0]:
+                        char = sys.stdin.read(1)
+                        if char:
+                            self.input_queue.put(char.lower())
+                except (IOError, OSError):
+                    # stdin might not be available (e.g., in Docker without TTY)
+                    break
+                except Exception as e:
+                    logger.debug(f"Input thread error: {e}")
+                    break
+        except Exception as e:
+            logger.debug(f"Input thread exception: {e}")
+    
+    def _start_input_thread(self):
+        """Start the keyboard input thread"""
+        try:
+            if sys.stdin.isatty():
+                self.input_thread = threading.Thread(target=self._input_thread_func, daemon=True)
+                self.input_thread.start()
+                logger.debug("Keyboard input thread started")
+        except Exception as e:
+            logger.debug(f"Could not start input thread: {e}")
+    
+    def _stop_input_thread(self):
+        """Stop the keyboard input thread"""
+        if self.input_thread and self.input_thread.is_alive():
+            self.running = False
+            self.input_thread.join(timeout=0.5)
+    
+    def _check_keyboard_input(self):
+        """Check for keyboard input from stdin (non-blocking)"""
+        try:
+            while not self.input_queue.empty():
+                char = self.input_queue.get_nowait()
+                if char == 'q':
+                    logger.info("Quit requested via keyboard (stdin)")
+                    self.running = False
+                    return 'quit'
+                elif char == 's':
+                    logger.warning("Emergency stop requested via keyboard (stdin)!")
+                    self.motor_controller.emergency_stop()
+                    self.state = 'idle'
+                    return 'stop'
+        except queue.Empty:
+            pass
+        except Exception as e:
+            logger.debug(f"Error checking keyboard input: {e}")
+        return None
+    
     def run(self):
         """Main control loop"""
         self.running = True
@@ -157,9 +225,17 @@ class RobotController:
             logger.info("Display output: ENABLED - Press 'q' to quit, 's' to emergency stop")
         else:
             logger.info("Display output: DISABLED - Running in headless mode")
+            logger.info("Press 'q' to quit, 's' to emergency stop (via terminal)")
+        
+        # Start keyboard input thread for headless mode
+        self._start_input_thread()
         
         try:
             while self.running:
+                # Check for keyboard input from stdin (works in headless mode)
+                input_result = self._check_keyboard_input()
+                if input_result == 'quit':
+                    break
                 loop_start = time.time()
                 
                 # Capture frame
@@ -203,13 +279,13 @@ class RobotController:
                         self._draw_overlay(frame, mp_results, is_waving, wave_position)
                         cv2.imshow('Duckiebot Science Fair Robot', frame)
                         
-                        # Handle key presses
+                        # Handle key presses from OpenCV window (if window has focus)
                         key = cv2.waitKey(1) & 0xFF
                         if key == ord('q'):
-                            logger.info("Quit requested via keyboard")
+                            logger.info("Quit requested via keyboard (OpenCV window)")
                             break
                         elif key == ord('s'):
-                            logger.warning("Emergency stop requested!")
+                            logger.warning("Emergency stop requested via keyboard (OpenCV window)!")
                             self.motor_controller.emergency_stop()
                             self.state = 'idle'
                     except Exception as e:
@@ -224,13 +300,14 @@ class RobotController:
                     time.sleep(frame_time_target - elapsed)
                     
         except KeyboardInterrupt:
-            logger.info("Interrupted by user")
+            logger.info("Interrupted by user (Ctrl+C)")
         except rospy.ROSInterruptException:
             logger.info("ROS interrupted")
         except Exception as e:
             logger.error(f"Error in main loop: {e}")
             logger.error(traceback.format_exc())
         finally:
+            self._stop_input_thread()
             self.shutdown()
     
     def _update_state(self, is_waving, wave_position, hands_data, frame):
