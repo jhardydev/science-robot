@@ -77,13 +77,21 @@ Edit `config.py` to adjust:
 ### Running in Container (Recommended)
 
 ```bash
-# Build and run
+# Build and run (headless mode - default)
 ./docker-run.sh --build
+
+# Run with virtual display and VNC (for remote viewing)
+./docker-run.sh --vnc
+
+# Run with X11 forwarding (if SSH X11 forwarding is configured)
+./docker-run.sh --display-output
 
 # Clean up before running (if needed)
 ./docker-cleanup.sh --all --force
 ./docker-run.sh --build
 ```
+
+**Note**: For viewing the robot's video output remotely, see [SSH_X11_SETUP.md](SSH_X11_SETUP.md) for detailed instructions on configuring X11 forwarding or VNC.
 
 ### Running Directly
 

@@ -14,6 +14,8 @@ ROS_MASTER=${ROS_MASTER_URI:-http://localhost:11311}
 BUILD=false
 USE_VIRTUAL_DISPLAY=${USE_VIRTUAL_DISPLAY:-false}
 DISPLAY_OUTPUT=${DISPLAY_OUTPUT:-false}
+ENABLE_VNC=${ENABLE_VNC:-false}
+VNC_PORT=${VNC_PORT:-5900}
 LOG_DIR="${HOME}/science-robot-logs"
 
 # Parse arguments
@@ -40,6 +42,16 @@ while [[ $# -gt 0 ]]; do
             DISPLAY_OUTPUT=true
             shift
             ;;
+        --vnc)
+            USE_VIRTUAL_DISPLAY=true
+            DISPLAY_OUTPUT=true
+            ENABLE_VNC=true
+            shift
+            ;;
+        --vnc-port)
+            VNC_PORT="$2"
+            shift 2
+            ;;
         --log-dir)
             LOG_DIR="$2"
             shift 2
@@ -59,6 +71,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --build                 Build image before running"
             echo "  --virtual-display       Enable virtual display (Xvfb) for headless video output"
             echo "  --display-output        Enable display output (requires X11 or virtual display)"
+            echo "  --vnc                   Enable virtual display with VNC server (combines --virtual-display + VNC)"
+            echo "  --vnc-port PORT         Set VNC port (default: 5900)"
             echo "  --log-dir DIR           Set log directory (default: ~/science-robot-logs)"
             echo "  --cleanup               Clean up containers, images, and volumes (then exit)"
             echo "  --help                  Show this help message"
@@ -82,6 +96,12 @@ echo "Robot name: $ROBOT_NAME"
 echo "ROS Master: $ROS_MASTER"
 echo "Virtual display: $USE_VIRTUAL_DISPLAY"
 echo "Display output: $DISPLAY_OUTPUT"
+if [ "$USE_VIRTUAL_DISPLAY" = "true" ]; then
+    echo "VNC enabled: $ENABLE_VNC"
+    if [ "$ENABLE_VNC" = "true" ]; then
+        echo "VNC port: $VNC_PORT"
+    fi
+fi
 echo "Log directory: $LOG_DIR"
 echo ""
 
@@ -133,6 +153,8 @@ ENV_VARS=(
     -e VEHICLE_NAME="$ROBOT_NAME"
     -e USE_VIRTUAL_DISPLAY="$USE_VIRTUAL_DISPLAY"
     -e DISPLAY_OUTPUT="$DISPLAY_OUTPUT"
+    -e ENABLE_VNC="$ENABLE_VNC"
+    -e VNC_PORT="$VNC_PORT"
 )
 
 # Add DISPLAY if not using virtual display
@@ -140,9 +162,19 @@ if [ "$USE_VIRTUAL_DISPLAY" != "true" ] && [ -n "$DISPLAY" ]; then
     ENV_VARS+=(-e DISPLAY="$DISPLAY")
 fi
 
+# Add VNC port mapping if VNC is enabled
+PORT_MAPPINGS=()
+if [ "$ENABLE_VNC" = "true" ]; then
+    PORT_MAPPINGS=(-p "${VNC_PORT}:${VNC_PORT}")
+    echo "VNC will be accessible on port ${VNC_PORT}"
+    echo "  Direct: robot-ip:${VNC_PORT}"
+    echo "  SSH tunnel: ssh -L ${VNC_PORT}:localhost:${VNC_PORT} user@robot-ip"
+fi
+
 docker run -it --rm \
     --name science-robot \
     --network host \
+    "${PORT_MAPPINGS[@]}" \
     "${ENV_VARS[@]}" \
     "${VOLUME_MOUNTS[@]}" \
     science-robot:latest

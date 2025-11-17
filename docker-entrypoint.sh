@@ -89,6 +89,23 @@ if [ "$USE_VIRTUAL_DISPLAY" = "true" ]; then
         export DISPLAY_OUTPUT=true
         echo "Virtual display started successfully on ${DISPLAY}"
         echo "Display size: ${VIRTUAL_DISPLAY_SIZE}"
+        
+        # Optionally start VNC server to share the virtual display
+        ENABLE_VNC=${ENABLE_VNC:-false}
+        VNC_PORT=${VNC_PORT:-5900}
+        if [ "$ENABLE_VNC" = "true" ]; then
+            echo "Starting VNC server on port ${VNC_PORT}..."
+            # Start x11vnc sharing the virtual display
+            x11vnc -display :${VIRTUAL_DISPLAY_NUM} -nopw -forever -shared -rfbport ${VNC_PORT} > /dev/null 2>&1 &
+            VNC_PID=$!
+            sleep 1
+            if kill -0 $VNC_PID 2>/dev/null; then
+                echo "VNC server started on port ${VNC_PORT}"
+                echo "Connect with: vncviewer <robot-ip>:${VNC_PORT}"
+            else
+                echo "Warning: Failed to start VNC server"
+            fi
+        fi
     else
         echo "Warning: Failed to start virtual display, falling back to headless mode"
         export DISPLAY_OUTPUT=false
