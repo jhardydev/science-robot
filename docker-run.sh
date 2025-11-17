@@ -210,6 +210,11 @@ ENV_VARS=(
     -e NVIDIA_DRIVER_CAPABILITIES=compute,utility
 )
 
+# Add VPI_PARENT_DIR if it was set
+if [ -n "$VPI_PARENT_DIR" ]; then
+    ENV_VARS+=(-e VPI_PARENT_DIR="$VPI_PARENT_DIR")
+fi
+
 # Add DISPLAY if not using virtual display
 if [ "$USE_VIRTUAL_DISPLAY" != "true" ] && [ -n "$DISPLAY" ]; then
     ENV_VARS+=(-e DISPLAY="$DISPLAY")
