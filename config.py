@@ -53,12 +53,22 @@ DANCE_MOVE_DURATION = 1.0  # Duration of each dance move in seconds
 # Main loop settings
 MAIN_LOOP_FPS = 30
 # Disable display output by default in container (headless mode)
-# Set to True only if you have X11 forwarding set up
+# Set to True only if you have X11 forwarding set up or virtual display enabled
 DISPLAY_OUTPUT = os.getenv('DISPLAY_OUTPUT', 'False').lower() == 'true'  # Auto-detect or use env var
 
+# Virtual display settings (for headless testing with video output)
+USE_VIRTUAL_DISPLAY = os.getenv('USE_VIRTUAL_DISPLAY', 'False').lower() == 'true'  # Start Xvfb virtual display
+VIRTUAL_DISPLAY_NUM = int(os.getenv('VIRTUAL_DISPLAY_NUM', '99'))  # Display number (e.g., :99)
+VIRTUAL_DISPLAY_SIZE = os.getenv('VIRTUAL_DISPLAY_SIZE', '1024x768x24')  # Resolution and depth
+
 # Debug settings
-DEBUG_MODE = False
+DEBUG_MODE = os.getenv('DEBUG_MODE', 'False').lower() == 'true'
 LOG_GESTURES = True
+
+# Logging settings
+LOG_DIR = os.getenv('LOG_DIR', '/code/logs')
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()  # DEBUG, INFO, WARNING, ERROR
+ENABLE_FILE_LOGGING = os.getenv('ENABLE_FILE_LOGGING', 'True').lower() == 'true'
 
 # NVIDIA acceleration settings
 USE_CUDA_ACCELERATION = True  # Use CUDA-accelerated OpenCV if available

@@ -72,12 +72,41 @@ if [ "$ROS_AVAILABLE" = false ]; then
     echo "The application may fail if ROS topics are not accessible."
 fi
 
-# Set Qt to use offscreen platform for headless operation
-export QT_QPA_PLATFORM=offscreen
-# Disable X11 if not available
-if [ -z "$DISPLAY" ] || [ ! -e /tmp/.X11-unix ]; then
-    echo "No X11 display available, running in headless mode"
-    export DISPLAY_OUTPUT=false
+# Virtual display setup (if enabled)
+USE_VIRTUAL_DISPLAY=${USE_VIRTUAL_DISPLAY:-false}
+VIRTUAL_DISPLAY_NUM=${VIRTUAL_DISPLAY_NUM:-99}
+VIRTUAL_DISPLAY_SIZE=${VIRTUAL_DISPLAY_SIZE:-1024x768x24}
+
+if [ "$USE_VIRTUAL_DISPLAY" = "true" ]; then
+    echo "Starting virtual display (Xvfb) on :${VIRTUAL_DISPLAY_NUM}..."
+    Xvfb :${VIRTUAL_DISPLAY_NUM} -screen 0 ${VIRTUAL_DISPLAY_SIZE} > /dev/null 2>&1 &
+    XVFB_PID=$!
+    sleep 1
+    
+    # Check if Xvfb started successfully
+    if kill -0 $XVFB_PID 2>/dev/null; then
+        export DISPLAY=:${VIRTUAL_DISPLAY_NUM}
+        export DISPLAY_OUTPUT=true
+        echo "Virtual display started successfully on ${DISPLAY}"
+        echo "Display size: ${VIRTUAL_DISPLAY_SIZE}"
+    else
+        echo "Warning: Failed to start virtual display, falling back to headless mode"
+        export DISPLAY_OUTPUT=false
+        export QT_QPA_PLATFORM=offscreen
+    fi
+elif [ -z "$DISPLAY" ] || [ ! -e /tmp/.X11-unix ]; then
+    # No virtual display and no X11 - run headless
+    echo "No display available, running in headless mode"
+    export DISPLAY_OUTPUT=${DISPLAY_OUTPUT:-false}
+    export QT_QPA_PLATFORM=offscreen
+else
+    # X11 display available from host
+    echo "Using X11 display: ${DISPLAY}"
+    export DISPLAY_OUTPUT=${DISPLAY_OUTPUT:-false}
+fi
+
+# Set Qt backend based on display availability
+if [ "$DISPLAY_OUTPUT" = "false" ]; then
     export QT_QPA_PLATFORM=offscreen
 fi
 

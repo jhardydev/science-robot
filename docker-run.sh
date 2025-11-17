@@ -12,6 +12,9 @@ NC='\033[0m' # No Color
 ROBOT_NAME=${VEHICLE_NAME:-robot1}
 ROS_MASTER=${ROS_MASTER_URI:-http://localhost:11311}
 BUILD=false
+USE_VIRTUAL_DISPLAY=${USE_VIRTUAL_DISPLAY:-false}
+DISPLAY_OUTPUT=${DISPLAY_OUTPUT:-false}
+LOG_DIR="${HOME}/science-robot-logs"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -28,6 +31,19 @@ while [[ $# -gt 0 ]]; do
             BUILD=true
             shift
             ;;
+        --virtual-display)
+            USE_VIRTUAL_DISPLAY=true
+            DISPLAY_OUTPUT=true
+            shift
+            ;;
+        --display-output)
+            DISPLAY_OUTPUT=true
+            shift
+            ;;
+        --log-dir)
+            LOG_DIR="$2"
+            shift 2
+            ;;
         --cleanup)
             # Run cleanup script
             SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -38,11 +54,14 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --robot-name NAME    Set robot name (default: robot1)"
-            echo "  --ros-master URI     Set ROS master URI (default: http://localhost:11311)"
-            echo "  --build              Build image before running"
-            echo "  --cleanup            Clean up containers, images, and volumes (then exit)"
-            echo "  --help               Show this help message"
+            echo "  --robot-name NAME       Set robot name (default: robot1)"
+            echo "  --ros-master URI        Set ROS master URI (default: http://localhost:11311)"
+            echo "  --build                 Build image before running"
+            echo "  --virtual-display       Enable virtual display (Xvfb) for headless video output"
+            echo "  --display-output        Enable display output (requires X11 or virtual display)"
+            echo "  --log-dir DIR           Set log directory (default: ~/science-robot-logs)"
+            echo "  --cleanup               Clean up containers, images, and volumes (then exit)"
+            echo "  --help                  Show this help message"
             echo ""
             echo "Examples:"
             echo "  $0 --build"
@@ -61,7 +80,13 @@ done
 echo -e "${GREEN}Duckiebot Science Fair Robot - Docker Runner${NC}"
 echo "Robot name: $ROBOT_NAME"
 echo "ROS Master: $ROS_MASTER"
+echo "Virtual display: $USE_VIRTUAL_DISPLAY"
+echo "Display output: $DISPLAY_OUTPUT"
+echo "Log directory: $LOG_DIR"
 echo ""
+
+# Create log directory if it doesn't exist
+mkdir -p "$LOG_DIR"
 
 # Build if requested
 if [ "$BUILD" = true ]; then
@@ -87,14 +112,38 @@ fi
 
 # Run container
 echo -e "${GREEN}Starting container...${NC}"
+
+# Build volume mounts
+VOLUME_MOUNTS=(
+    -v "$LOG_DIR:/code/logs"
+)
+
+# Add X11 mounts if not using virtual display
+if [ "$USE_VIRTUAL_DISPLAY" != "true" ] && [ -n "$DISPLAY" ] && [ -e /tmp/.X11-unix ]; then
+    VOLUME_MOUNTS+=(-v /tmp/.X11-unix:/tmp/.X11-unix:rw)
+    if [ -e "$HOME/.Xauthority" ]; then
+        VOLUME_MOUNTS+=(-v "$HOME/.Xauthority:/root/.Xauthority:rw")
+    fi
+fi
+
+# Build environment variables
+ENV_VARS=(
+    -e ROS_MASTER_URI="$ROS_MASTER"
+    -e ROS_HOSTNAME=science-robot
+    -e VEHICLE_NAME="$ROBOT_NAME"
+    -e USE_VIRTUAL_DISPLAY="$USE_VIRTUAL_DISPLAY"
+    -e DISPLAY_OUTPUT="$DISPLAY_OUTPUT"
+)
+
+# Add DISPLAY if not using virtual display
+if [ "$USE_VIRTUAL_DISPLAY" != "true" ] && [ -n "$DISPLAY" ]; then
+    ENV_VARS+=(-e DISPLAY="$DISPLAY")
+fi
+
 docker run -it --rm \
     --name science-robot \
     --network host \
-    -e ROS_MASTER_URI="$ROS_MASTER" \
-    -e ROS_HOSTNAME=science-robot \
-    -e VEHICLE_NAME="$ROBOT_NAME" \
-    -e DISPLAY="${DISPLAY:-:0}" \
-    -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-    -v "$HOME/.Xauthority:/root/.Xauthority:rw" \
+    "${ENV_VARS[@]}" \
+    "${VOLUME_MOUNTS[@]}" \
     science-robot:latest
 

@@ -14,7 +14,33 @@ import cv2
 import time
 import signal
 import sys
+import os
+import logging
+from datetime import datetime
+import traceback
 import config
+
+# Setup logging
+os.makedirs(config.LOG_DIR, exist_ok=True)
+log_file = os.path.join(config.LOG_DIR, f'science_robot_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
+
+# Configure logging level
+log_level = getattr(logging, config.LOG_LEVEL, logging.INFO)
+
+# Create handlers
+handlers = [logging.StreamHandler(sys.stdout)]
+if config.ENABLE_FILE_LOGGING:
+    handlers.append(logging.FileHandler(log_file))
+
+logging.basicConfig(
+    level=log_level,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=handlers
+)
+
+logger = logging.getLogger(__name__)
+logger.info(f"Logging initialized. Log file: {log_file}")
+logger.info(f"Log level: {config.LOG_LEVEL}")
 from src.camera import Camera
 from src.gesture_detector import GestureDetector
 from src.wave_detector import WaveDetector
@@ -29,7 +55,7 @@ if config.USE_VPI_ACCELERATION:
         from src.vpi_processor import VPIProcessor
         vpi_processor = VPIProcessor(backend=config.VPI_BACKEND)
     except ImportError:
-        print("VPI not available, continuing without GPU preprocessing")
+        logger.warning("VPI not available, continuing without GPU preprocessing")
         vpi_processor = None
 else:
     vpi_processor = None
@@ -40,59 +66,69 @@ class RobotController:
     
     def __init__(self):
         """Initialize all robot subsystems"""
-        print("Initializing Duckiebot Science Fair Robot...")
-        print("NVIDIA acceleration: ", end="")
+        logger.info("Initializing Duckiebot Science Fair Robot...")
         if config.USE_CUDA_ACCELERATION or config.USE_VPI_ACCELERATION:
-            print("ENABLED")
+            logger.info("NVIDIA acceleration: ENABLED")
         else:
-            print("DISABLED")
+            logger.info("NVIDIA acceleration: DISABLED")
         
-        # Initialize components
-        self.camera = Camera()
-        self.gesture_detector = GestureDetector(
-            min_detection_confidence=config.GESTURE_CONFIDENCE_THRESHOLD,
-            min_tracking_confidence=config.GESTURE_CONFIDENCE_THRESHOLD
-        )
-        self.wave_detector = WaveDetector()
-        self.motor_controller = MotorController()
-        self.navigation = NavigationController()
-        self.dance_controller = DanceController(self.motor_controller)
-        self.treat_dispenser = TreatDispenser()
-        
-        # VPI processor for GPU-accelerated preprocessing
-        self.vpi_processor = vpi_processor
-        
-        # State management
-        self.running = False
-        self.state = 'idle'  # idle, tracking, dancing
-        self.frame_count = 0
-        
-        # Performance monitoring
-        self.frame_times = []
-        self.processing_times = []
-        
-        # Gesture tracking
-        self.last_dance_gesture_time = 0
-        self.last_treat_gesture_time = 0
-        self.current_gesture_hold_time = 0
-        self.current_gesture = None
-        
-        print("Robot initialized successfully!")
-        if self.camera.has_cuda():
-            print("  - CUDA acceleration: Available")
-        if self.vpi_processor and self.vpi_processor.is_available():
-            print("  - VPI acceleration: Available")
+        try:
+            # Initialize components
+            self.camera = Camera()
+            self.gesture_detector = GestureDetector(
+                min_detection_confidence=config.GESTURE_CONFIDENCE_THRESHOLD,
+                min_tracking_confidence=config.GESTURE_CONFIDENCE_THRESHOLD
+            )
+            self.wave_detector = WaveDetector()
+            self.motor_controller = MotorController()
+            self.navigation = NavigationController()
+            self.dance_controller = DanceController(self.motor_controller)
+            self.treat_dispenser = TreatDispenser()
+            
+            # VPI processor for GPU-accelerated preprocessing
+            self.vpi_processor = vpi_processor
+            
+            # State management
+            self.running = False
+            self.state = 'idle'  # idle, tracking, dancing
+            self.frame_count = 0
+            
+            # Performance monitoring
+            self.frame_times = []
+            self.processing_times = []
+            
+            # Gesture tracking
+            self.last_dance_gesture_time = 0
+            self.last_treat_gesture_time = 0
+            self.current_gesture_hold_time = 0
+            self.current_gesture = None
+            
+            logger.info("Robot initialized successfully!")
+            if self.camera.has_cuda():
+                logger.info("  - CUDA acceleration: Available")
+            if self.vpi_processor and self.vpi_processor.is_available():
+                logger.info("  - VPI acceleration: Available")
+        except Exception as e:
+            logger.error(f"Failed to initialize robot: {e}")
+            logger.error(traceback.format_exc())
+            raise
     
     def initialize(self):
         """Initialize camera and hardware"""
-        if not self.camera.initialize():
-            print("Failed to initialize camera")
+        try:
+            if not self.camera.initialize():
+                logger.error("Failed to initialize camera")
+                return False
+            
+            if not self.treat_dispenser.initialize():
+                logger.warning("Treat dispenser initialization failed")
+            
+            logger.info("All subsystems initialized successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Initialization error: {e}")
+            logger.error(traceback.format_exc())
             return False
-        
-        if not self.treat_dispenser.initialize():
-            print("Warning: Treat dispenser initialization failed")
-        
-        return True
     
     def _preprocess_frame(self, frame):
         """
@@ -116,8 +152,11 @@ class RobotController:
         self.running = True
         frame_time_target = 1.0 / config.MAIN_LOOP_FPS
         
-        print("Starting main control loop...")
-        print("Press 'q' to quit, 's' to emergency stop")
+        logger.info("Starting main control loop...")
+        if config.DISPLAY_OUTPUT:
+            logger.info("Display output: ENABLED - Press 'q' to quit, 's' to emergency stop")
+        else:
+            logger.info("Display output: DISABLED - Running in headless mode")
         
         try:
             while self.running:
@@ -126,7 +165,7 @@ class RobotController:
                 # Capture frame
                 success, frame = self.camera.read_frame()
                 if not success:
-                    print("Failed to read frame")
+                    logger.warning("Failed to read frame")
                     time.sleep(0.1)
                     continue
                 
@@ -156,7 +195,7 @@ class RobotController:
                     if self.frame_count % 30 == 0:  # Every 30 frames
                         avg_frame_time = sum(self.frame_times[-30:]) / len(self.frame_times[-30:])
                         avg_detection_time = sum(self.processing_times[-30:]) / len(self.processing_times[-30:])
-                        print(f"Performance: {1.0/avg_frame_time:.1f} FPS, Detection: {avg_detection_time*1000:.1f}ms")
+                        logger.debug(f"Performance: {1.0/avg_frame_time:.1f} FPS, Detection: {avg_detection_time*1000:.1f}ms")
                 
                 # Display output if enabled
                 if config.DISPLAY_OUTPUT:
@@ -167,15 +206,16 @@ class RobotController:
                         # Handle key presses
                         key = cv2.waitKey(1) & 0xFF
                         if key == ord('q'):
-                            print("Quit requested")
+                            logger.info("Quit requested via keyboard")
                             break
                         elif key == ord('s'):
-                            print("Emergency stop!")
+                            logger.warning("Emergency stop requested!")
                             self.motor_controller.emergency_stop()
                             self.state = 'idle'
                     except Exception as e:
                         # If display fails, disable display output
-                        rospy.logwarn(f"Display output failed: {e}, disabling display")
+                        logger.warning(f"Display output failed: {e}, disabling display")
+                        logger.debug(traceback.format_exc())
                         config.DISPLAY_OUTPUT = False
                 
                 # Maintain target FPS
@@ -184,11 +224,12 @@ class RobotController:
                     time.sleep(frame_time_target - elapsed)
                     
         except KeyboardInterrupt:
-            print("\nInterrupted by user")
+            logger.info("Interrupted by user")
+        except rospy.ROSInterruptException:
+            logger.info("ROS interrupted")
         except Exception as e:
-            print(f"Error in main loop: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Error in main loop: {e}")
+            logger.error(traceback.format_exc())
         finally:
             self.shutdown()
     
@@ -233,7 +274,7 @@ class RobotController:
         elif treat_gesture_detected:
             # Handle treat gesture (future feature)
             if config.LOG_GESTURES:
-                print("Secret treat gesture detected!")
+                logger.info("Secret treat gesture detected!")
             self.treat_dispenser.dispense_treat()
             self.current_gesture = None
             self.current_gesture_hold_time = 0
@@ -314,22 +355,26 @@ class RobotController:
     
     def shutdown(self):
         """Gracefully shutdown robot"""
-        print("Shutting down robot...")
+        logger.info("Shutting down robot...")
         self.running = False
-        self.motor_controller.stop()
-        time.sleep(0.2)
-        self.motor_controller.cleanup()
-        self.camera.release()
-        self.gesture_detector.close()
-        self.treat_dispenser.cleanup()
-        if config.DISPLAY_OUTPUT:
-            cv2.destroyAllWindows()
-        print("Shutdown complete")
+        try:
+            self.motor_controller.stop()
+            time.sleep(0.2)
+            self.motor_controller.cleanup()
+            self.camera.release()
+            self.gesture_detector.close()
+            self.treat_dispenser.cleanup()
+            if config.DISPLAY_OUTPUT:
+                cv2.destroyAllWindows()
+            logger.info("Shutdown complete")
+        except Exception as e:
+            logger.error(f"Error during shutdown: {e}")
+            logger.error(traceback.format_exc())
 
 
 def signal_handler(sig, frame):
     """Handle interrupt signals"""
-    print("\nReceived interrupt signal")
+    logger.info("Received interrupt signal")
     rospy.signal_shutdown("Interrupted by user")
     sys.exit(0)
 
@@ -355,9 +400,9 @@ def main():
     except rospy.ROSInterruptException:
         rospy.loginfo("ROS interrupted")
     except Exception as e:
+        logger.error(f"Fatal error: {e}")
+        logger.error(traceback.format_exc())
         rospy.logerr(f"Fatal error: {e}")
-        import traceback
-        traceback.print_exc()
         return 1
     
     return 0

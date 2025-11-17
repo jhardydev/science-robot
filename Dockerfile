@@ -19,6 +19,8 @@ RUN apt-get update && apt-get install -y \
     python3-opencv \
     libgl1-mesa-glx \
     libglib2.0-0 \
+    xvfb \
+    x11vnc \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -36,6 +38,9 @@ COPY . .
 
 # Make main script executable
 RUN chmod +x main.py
+
+# Create logs directory
+RUN mkdir -p /code/logs
 
 # Set ROS environment variables (these will be set by Duckietown's entrypoint)
 # ENV ROS_MASTER_URI=http://localhost:11311
