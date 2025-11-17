@@ -54,15 +54,15 @@ try:
     # Try resize operation - VPI Image has rescale method
     resized = None
     try:
-        # Use rescale method on Image object
-        resized = vpi_img.rescale((50, 50), interp=vpi.Interp.LINEAR)
+        # Use rescale method on Image object - backend is required
+        resized = vpi_img.rescale((50, 50), interp=vpi.Interp.LINEAR, backend=vpi.Backend.CUDA)
         print("✓ VPI resize operation (rescale): OK")
     except (AttributeError, TypeError) as e1:
         try:
             # Try with scale factors instead of target size
             scale_x = 50 / vpi_img.width
             scale_y = 50 / vpi_img.height
-            resized = vpi_img.rescale((scale_x, scale_y), interp=vpi.Interp.LINEAR)
+            resized = vpi_img.rescale((scale_x, scale_y), interp=vpi.Interp.LINEAR, backend=vpi.Backend.CUDA)
             print("✓ VPI resize operation (rescale with scale factors): OK")
         except Exception as e2:
             print(f"✗ VPI resize operation failed: {e1}, {e2}")

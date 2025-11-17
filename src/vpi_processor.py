@@ -92,11 +92,16 @@ class VPIProcessor:
             # Convert numpy array to VPI image
             vpi_img = vpi.asimage(image)
             
+            # Ensure backend is set (should not happen, but safety check)
+            if self.vpi_backend is None:
+                raise AttributeError("VPI backend not initialized")
+            
             # VPI Image object has a rescale method for resizing
             # Try different possible API patterns
             resized = None
             try:
                 # Method 1: Use rescale method directly (most direct)
+                # rescale requires backend parameter (mandatory in VPI)
                 # rescale likely takes (width, height) or scale factor
                 if hasattr(vpi_img, 'rescale'):
                     # Try with target size tuple
