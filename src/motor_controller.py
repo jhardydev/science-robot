@@ -22,14 +22,24 @@ class MotorController:
         self.wheels_pub = rospy.Publisher(
             config.MOTOR_TOPIC,
             WheelsCmdStamped,
-            queue_size=1
+            queue_size=1,
+            latch=False  # Don't latch - send fresh commands each time
         )
         
         # Wait a moment for publisher to connect
-        rospy.sleep(0.1)
+        rospy.sleep(0.2)
+        
+        # Check if publisher has subscribers (motor driver is listening)
+        subscriber_count = self.wheels_pub.get_num_connections()
+        if subscriber_count == 0:
+            rospy.logwarn(f"Motor command topic '{config.MOTOR_TOPIC}' has no subscribers!")
+            rospy.logwarn("  Make sure the wheels_driver_node is running")
+        else:
+            rospy.loginfo(f"Motor command topic has {subscriber_count} subscriber(s)")
         
         self.is_stopped = True
-        rospy.loginfo("Motor controller initialized (ROS)")
+        self._last_log_time = 0
+        rospy.loginfo(f"Motor controller initialized (ROS) - Topic: {config.MOTOR_TOPIC}")
     
     def _publish_wheel_command(self, left_speed, right_speed):
         """
@@ -44,10 +54,31 @@ class MotorController:
         msg.header = Header()
         msg.header.stamp = rospy.Time.now()
         
-        # Duckiebot wheels_driver expects speeds in m/s typically
-        # Scale by max speed from config
-        msg.vel_left = float(left_speed * config.MOTOR_MAX_SPEED)
-        msg.vel_right = float(right_speed * config.MOTOR_MAX_SPEED)
+        # Duckiebot wheels_driver expects speeds in m/s
+        # Duckiebot typical max speed is around 0.5-1.0 m/s
+        # Scale normalized speeds (-1.0 to 1.0) to actual velocities
+        # Using MOTOR_MAX_SPEED as scaling factor (in m/s, not normalized)
+        # If MOTOR_MAX_SPEED is 0.8, a normalized speed of 1.0 becomes 0.8 m/s
+        
+        # Clamp normalized speeds first
+        left_speed = max(-1.0, min(1.0, float(left_speed)))
+        right_speed = max(-1.0, min(1.0, float(right_speed)))
+        
+        # Convert to m/s (Duckiebot expects velocities in m/s)
+        # Note: MOTOR_MAX_SPEED is already in m/s, so multiply by it
+        msg.vel_left = left_speed * config.MOTOR_MAX_SPEED
+        msg.vel_right = right_speed * config.MOTOR_MAX_SPEED
+        
+        # Log motor commands for debugging (but throttle to avoid spam)
+        if not hasattr(self, '_last_log_time'):
+            self._last_log_time = 0
+            self._log_interval = 1.0  # Log every 1 second
+        
+        current_time = rospy.get_time()
+        if current_time - self._last_log_time >= self._log_interval:
+            rospy.logdebug(f"Motor command: left={msg.vel_left:.3f} m/s, right={msg.vel_right:.3f} m/s "
+                          f"(normalized: left={left_speed:.2f}, right={right_speed:.2f})")
+            self._last_log_time = current_time
         
         self.wheels_pub.publish(msg)
         self.is_stopped = (left_speed == 0.0 and right_speed == 0.0)

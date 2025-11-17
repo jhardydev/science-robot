@@ -4,10 +4,23 @@ Duckiebot Science Fair Robot - Main Control Loop
 Detects waving, steers toward wavers, performs dance on gesture, and handles treat dispensing
 Enhanced with NVIDIA GPU acceleration and ROS integration
 """
+# Suppress fontconfig warnings before matplotlib import
+# Redirect fontconfig stderr to /dev/null to avoid noisy warnings
+import os
+import sys
+_fontconfig_fd = os.open('/dev/null', os.O_WRONLY)
+_fontconfig_old_stderr = os.dup(2)
+os.dup2(_fontconfig_fd, 2)
+os.close(_fontconfig_fd)
+
 # Set matplotlib backend before any imports that might use it
 # MediaPipe imports matplotlib, which needs a non-GUI backend in containers
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend for headless environments
+
+# Restore stderr after matplotlib imports fontconfig
+os.dup2(_fontconfig_old_stderr, 2)
+os.close(_fontconfig_old_stderr)
 
 import rospy
 import cv2
@@ -22,6 +35,10 @@ import threading
 import queue
 import select
 import config
+
+# Additional fontconfig suppression via environment
+os.environ['FONTCONFIG_FILE'] = os.environ.get('FONTCONFIG_FILE', '/etc/fonts/fonts.conf')
+os.environ['FC_DEBUG'] = '0'
 
 # Setup logging
 os.makedirs(config.LOG_DIR, exist_ok=True)
@@ -407,8 +424,12 @@ class RobotController:
             # Check if we should stop (target is close)
             if self.navigation.should_stop(wave_position):
                 self.motor_controller.stop()
+                if self.frame_count % 30 == 0:  # Log occasionally
+                    logger.debug(f"Target close, stopping. Position: {wave_position}")
             else:
                 self.motor_controller.set_differential_speed(left_speed, right_speed)
+                if self.frame_count % 30 == 0:  # Log occasionally
+                    logger.debug(f"Tracking wave - steering: left={left_speed:.2f}, right={right_speed:.2f}, position={wave_position}")
         else:
             # No target - stop and return to idle
             self.state = 'idle'

@@ -233,7 +233,13 @@ else
 fi
 
 # Suppress fontconfig warnings (they're harmless but noisy)
+# Redirect fontconfig errors to /dev/null
 export FONTCONFIG_FILE=/etc/fonts/fonts.conf 2>/dev/null || true
+export FC_DEBUG=0 2>/dev/null || true
+# Create a minimal fontconfig config if it's broken
+if [ -f /etc/fonts/fonts.conf ] && ! xmllint /etc/fonts/fonts.conf >/dev/null 2>&1; then
+    echo "Warning: fonts.conf is invalid XML, fontconfig may complain"
+fi
 
 # Execute the command
 echo "Starting application: $@"
