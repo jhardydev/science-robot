@@ -245,22 +245,36 @@ fi
 ROBOT_NAME=${VEHICLE_NAME:-robot1}
 WHEELS_TOPIC="/${ROBOT_NAME}/wheels_driver_node/wheels_cmd"
 
-echo "Checking if wheels driver node is running..."
-# Check if topic has subscribers or if node is running
+echo "Checking if wheels driver node is ready (node running AND topic has subscribers)..."
+# Check if topic has subscribers - this is the real test
 WHEELS_RUNNING=false
 
-# Check if node exists
 if rostopic list > /dev/null 2>&1; then
-    if rosnode list 2>/dev/null | grep -q "wheels_driver_node"; then
-        echo "✓ wheels_driver_node is already running"
-        WHEELS_RUNNING=true
-    # Check if topic exists and has subscribers (topic exists means driver is running)
-    elif rostopic info "$WHEELS_TOPIC" > /dev/null 2>&1; then
-        # Topic exists - check if it has subscribers
+    # Check if topic exists and actually has subscribers
+    if rostopic info "$WHEELS_TOPIC" > /dev/null 2>&1; then
         topic_info=$(rostopic info "$WHEELS_TOPIC" 2>/dev/null)
-        if echo "$topic_info" | grep -q "Subscribers:"; then
-            echo "✓ wheels driver topic exists and has subscribers"
+        # Check for subscribers - rostopic info shows "Subscribers:" even with 0 subscribers
+        # Look for subscriber nodes listed after "Subscribers:"
+        subscriber_section=$(echo "$topic_info" | sed -n '/Subscribers:/,/Publishers:/p' | head -n -1)
+        # Count non-empty lines after "Subscribers:" (excluding the header line itself)
+        subscriber_count=$(echo "$subscriber_section" | tail -n +2 | grep -v "^$" | grep -v "^Publishers:" | wc -l)
+        
+        if [ "$subscriber_count" -gt 0 ] 2>/dev/null; then
+            echo "✓ wheels driver topic has $subscriber_count subscriber(s)"
             WHEELS_RUNNING=true
+        else
+            # Node might be running but not subscribed - check if node exists
+            if rosnode list 2>/dev/null | grep -q "wheels_driver_node"; then
+                echo "⚠ wheels_driver_node is running but topic has no subscribers (node may need to subscribe)"
+                # Don't set WHEELS_RUNNING=true - we need subscribers
+            else
+                echo "⚠ Topic exists but no wheels_driver_node found and no subscribers"
+            fi
+        fi
+    else
+        # Topic doesn't exist - check if node is running anyway
+        if rosnode list 2>/dev/null | grep -q "wheels_driver_node"; then
+            echo "⚠ wheels_driver_node is running but topic $WHEELS_TOPIC doesn't exist"
         fi
     fi
 fi
@@ -312,22 +326,34 @@ if [ "$WHEELS_RUNNING" = false ]; then
         fi
     fi
     
-    # Wait a bit for topic to become available
+    # Wait for topic to become available AND have subscribers
     if [ "$WHEELS_RUNNING" = true ]; then
-        echo "Waiting for wheels driver topic to become available..."
-        timeout=10
+        echo "Waiting for wheels driver topic to have subscribers..."
+        timeout=15
         elapsed=0
         while [ $elapsed -lt $timeout ]; do
             if rostopic info "$WHEELS_TOPIC" > /dev/null 2>&1; then
-                echo "✓ Wheels driver topic is available: $WHEELS_TOPIC"
-                break
+                topic_info=$(rostopic info "$WHEELS_TOPIC" 2>/dev/null)
+                subscriber_section=$(echo "$topic_info" | sed -n '/Subscribers:/,/Publishers:/p' | head -n -1)
+                subscriber_count=$(echo "$subscriber_section" | tail -n +2 | grep -v "^$" | grep -v "^Publishers:" | wc -l)
+                
+                if [ "$subscriber_count" -gt 0 ] 2>/dev/null; then
+                    echo "✓ Wheels driver topic is ready with $subscriber_count subscriber(s): $WHEELS_TOPIC"
+                    WHEELS_RUNNING=true
+                    break
+                fi
             fi
             sleep 0.5
             elapsed=$((elapsed + 1))
+            if [ $((elapsed % 4)) -eq 0 ]; then
+                echo "  Still waiting for subscribers... (${elapsed}/${timeout}s)"
+            fi
         done
         
         if [ $elapsed -ge $timeout ]; then
-            echo "⚠ Topic not available after ${timeout}s, but node may still be starting"
+            echo "⚠ Topic available but no subscribers after ${timeout}s"
+            echo "  The wheels_driver_node may need configuration or the topic name may be wrong"
+            WHEELS_RUNNING=false
         fi
     else
         echo "⚠ Could not start wheels driver automatically"
