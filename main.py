@@ -91,24 +91,24 @@ class RobotController:
             # VPI processor for GPU-accelerated preprocessing
             self.vpi_processor = vpi_processor
             
-        # State management
-        self.running = False
-        self.state = 'idle'  # idle, tracking, dancing
-        self.frame_count = 0
-        
-        # Performance monitoring
-        self.frame_times = []
-        self.processing_times = []
-        
-        # Gesture tracking
-        self.last_dance_gesture_time = 0
-        self.last_treat_gesture_time = 0
-        self.current_gesture_hold_time = 0
-        self.current_gesture = None
-        
-        # Display window state (for X11 initialization)
-        self.display_window_created = False
-        self.display_init_retries = 0
+            # State management
+            self.running = False
+            self.state = 'idle'  # idle, tracking, dancing
+            self.frame_count = 0
+            
+            # Performance monitoring
+            self.frame_times = []
+            self.processing_times = []
+            
+            # Gesture tracking
+            self.last_dance_gesture_time = 0
+            self.last_treat_gesture_time = 0
+            self.current_gesture_hold_time = 0
+            self.current_gesture = None
+            
+            # Display window state (for X11 initialization)
+            self.display_window_created = False
+            self.display_init_retries = 0
             
             # Keyboard input handling (for headless mode)
             self.input_queue = queue.Queue()
