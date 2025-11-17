@@ -4,7 +4,7 @@ Duckiebot Science Fair Robot - Main Control Loop
 Detects waving, steers toward wavers, performs dance on gesture, and handles treat dispensing
 Enhanced with NVIDIA GPU acceleration and ROS integration
 """
-# Suppress fontconfig warnings before matplotlib import
+# Suppress fontconfig warnings during all imports
 # Redirect fontconfig stderr to /dev/null to avoid noisy warnings
 import os
 import sys
@@ -18,16 +18,15 @@ os.close(_fontconfig_fd)
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend for headless environments
 
-# Restore stderr after matplotlib imports fontconfig
-os.dup2(_fontconfig_old_stderr, 2)
-os.close(_fontconfig_old_stderr)
+# Additional fontconfig suppression via environment (before MediaPipe import)
+os.environ['FONTCONFIG_FILE'] = os.environ.get('FONTCONFIG_FILE', '/etc/fonts/fonts.conf')
+os.environ['FC_DEBUG'] = '0'
 
 import rospy
 import cv2
 import time
 import signal
 import sys
-import os
 import logging
 from datetime import datetime
 import traceback
@@ -36,9 +35,20 @@ import queue
 import select
 import config
 
-# Additional fontconfig suppression via environment
-os.environ['FONTCONFIG_FILE'] = os.environ.get('FONTCONFIG_FILE', '/etc/fonts/fonts.conf')
-os.environ['FC_DEBUG'] = '0'
+# Import MediaPipe (which uses matplotlib and triggers font_manager initialization)
+# Keep stderr redirected during this import
+from src.camera import Camera
+from src.gesture_detector import GestureDetector
+from src.wave_detector import WaveDetector
+from src.motor_controller import MotorController
+from src.navigation import NavigationController
+from src.dance import DanceController
+from src.treat_dispenser import TreatDispenser
+
+# Now restore stderr after all imports that might trigger fontconfig
+os.dup2(_fontconfig_old_stderr, 2)
+os.close(_fontconfig_old_stderr)
+del _fontconfig_fd, _fontconfig_old_stderr
 
 # Setup logging
 os.makedirs(config.LOG_DIR, exist_ok=True)
@@ -61,13 +71,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.info(f"Logging initialized. Log file: {log_file}")
 logger.info(f"Log level: {config.LOG_LEVEL}")
-from src.camera import Camera
-from src.gesture_detector import GestureDetector
-from src.wave_detector import WaveDetector
-from src.motor_controller import MotorController
-from src.navigation import NavigationController
-from src.dance import DanceController
-from src.treat_dispenser import TreatDispenser
 
 # Conditionally import VPI processor
 if config.USE_VPI_ACCELERATION:
