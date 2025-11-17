@@ -59,11 +59,33 @@ X11 forwarding allows you to display GUI applications from the robot on your loc
 **1. Start X11 server on your local machine:**
 
 **macOS:**
-- Open XQuartz (Applications > Utilities > XQuartz)
-- In XQuartz preferences, go to "Security" tab
-- Check "Allow connections from network clients"
-- Restart XQuartz
-- You may need to restart your computer after first installing XQuartz
+- **Install XQuartz** (if not installed):
+  ```bash
+  brew install --cask xquartz
+  # Or download from: https://www.xquartz.org/
+  ```
+
+- **Open XQuartz** (Applications > Utilities > XQuartz)
+  - Make sure it's actually running (check Dock)
+
+- **Configure XQuartz:**
+  - XQuartz > Preferences > Security
+  - ✅ Check "Allow connections from network clients"
+  - Close preferences
+
+- **Set DISPLAY on your Mac:**
+  ```bash
+  # In a NEW terminal (after XQuartz is running):
+  echo $DISPLAY
+  # If empty, set it:
+  export DISPLAY=:0
+  # Make it permanent:
+  echo 'export DISPLAY=:0' >> ~/.zshrc  # or ~/.bash_profile
+  source ~/.zshrc
+  ```
+
+- **Restart XQuartz** (quit and reopen)
+- **Restart your Mac** (after first installing XQuartz)
 
 **Linux:**
 - X11 server should already be running

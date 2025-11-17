@@ -4,6 +4,10 @@
 
 This means the `DISPLAY` environment variable is not set.
 
+## Problem: "X11 forwarding requested but DISPLAY not set"
+
+This means your **local machine** (Mac) doesn't have DISPLAY set. SSH needs this to forward X11.
+
 ## Quick Fix Steps
 
 ### 1. Check DISPLAY variable
@@ -75,14 +79,53 @@ sudo apt-get update
 sudo apt-get install xauth x11-apps
 ```
 
-### 5. macOS XQuartz setup
+### 5. macOS XQuartz setup (CRITICAL)
 
 **On your Mac:**
-1. Open XQuartz (Applications > Utilities > XQuartz)
-2. Go to XQuartz > Preferences > Security
-3. Check "Allow connections from network clients"
-4. **Restart XQuartz** (quit and reopen)
-5. **Restart your Mac** (after first install)
+
+1. **Open XQuartz** (Applications > Utilities > XQuartz)
+   - If it's not installed: `brew install --cask xquartz`
+   - Or download from: https://www.xquartz.org/
+
+2. **Configure XQuartz:**
+   - XQuartz > Preferences > Security
+   - ✅ Check "Allow connections from network clients"
+   - Close preferences
+
+3. **Restart XQuartz:**
+   - Quit XQuartz completely (Cmd+Q)
+   - Reopen XQuartz
+
+4. **Check DISPLAY is set on your Mac:**
+   ```bash
+   # In a NEW terminal window (after XQuartz is running):
+   echo $DISPLAY
+   ```
+   
+   **If DISPLAY is empty**, you need to set it:
+   ```bash
+   # Find your XQuartz display:
+   ls -la /tmp/.X11-unix
+   # Should show files like X0, X1, etc.
+   
+   # Set DISPLAY (adjust X0 to match what you see):
+   export DISPLAY=:0
+   # Or try:
+   export DISPLAY=/private/tmp/com.apple.launchd.*/org.xquartz:0
+   
+   # Make it permanent in your shell profile:
+   echo 'export DISPLAY=:0' >> ~/.zshrc  # or ~/.bash_profile
+   source ~/.zshrc
+   ```
+
+5. **Restart your Mac** (after first installing XQuartz)
+
+6. **Verify XQuartz is running:**
+   ```bash
+   # Check if XQuartz process is running:
+   ps aux | grep -i xquartz
+   # Should show Xquartz process
+   ```
 
 ### 6. Test X11 forwarding
 
@@ -158,4 +201,51 @@ xeyes
 ```
 
 Run: `chmod +x test-x11.sh && ./test-x11.sh`
+
+## Fix: "X11 forwarding requested but DISPLAY not set"
+
+**This error means your Mac doesn't have DISPLAY set.**
+
+### Step-by-step fix:
+
+1. **On your Mac, check if DISPLAY is set:**
+   ```bash
+   echo $DISPLAY
+   ```
+
+2. **If empty, start XQuartz:**
+   - Open XQuartz application
+   - Make sure it's running (check Dock or Activity Monitor)
+
+3. **Set DISPLAY on your Mac:**
+   ```bash
+   # Try these in order:
+   export DISPLAY=:0
+   # Or:
+   export DISPLAY=/private/tmp/com.apple.launchd.*/org.xquartz:0
+   # Or find it:
+   echo $DISPLAY
+   ```
+
+4. **Make it permanent:**
+   ```bash
+   # Add to your shell profile:
+   echo 'export DISPLAY=:0' >> ~/.zshrc
+   source ~/.zshrc
+   ```
+
+5. **Now try SSH again:**
+   ```bash
+   ssh -X duckie@robot1
+   # Check verbose output:
+   ssh -v -X duckie@robot1 2>&1 | grep -i display
+   # Should NOT show "DISPLAY not set"
+   ```
+
+6. **On robot, verify:**
+   ```bash
+   echo $DISPLAY
+   # Should show: localhost:10.0
+   xeyes
+   ```
 
