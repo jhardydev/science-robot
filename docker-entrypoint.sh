@@ -155,15 +155,32 @@ fi
 
 # Setup VPI library paths (if VPI is mounted from host)
 # VPI may be mounted in /host paths, need to add to PYTHONPATH and LD_LIBRARY_PATH
-if [ -d /host/usr/lib/python3/dist-packages ]; then
-    export PYTHONPATH="/host/usr/lib/python3/dist-packages:$PYTHONPATH"
-    echo "Added /host/usr/lib/python3/dist-packages to PYTHONPATH for VPI"
-fi
+# Only add specific VPI paths, not entire dist-packages (avoids conflicts)
+
+# Find VPI package in mounted paths
+VPI_PATHS=(
+    "/host/usr/lib/python3/dist-packages/vpi"
+    "/host/usr/local/lib/python3/dist-packages/vpi"
+)
+
+for VPI_PATH in "${VPI_PATHS[@]}"; do
+    if [ -d "$VPI_PATH" ] || [ -f "${VPI_PATH}.py" ]; then
+        VPI_PARENT=$(dirname "$VPI_PATH" 2>/dev/null || echo "")
+        if [ -n "$VPI_PARENT" ] && [ -d "$VPI_PARENT" ]; then
+            export PYTHONPATH="$VPI_PARENT:$PYTHONPATH"
+            echo "Added $VPI_PARENT to PYTHONPATH for VPI"
+            break
+        fi
+    fi
+done
 
 # Add VPI library paths to LD_LIBRARY_PATH
 if [ -d /host/usr/lib/aarch64-linux-gnu ]; then
-    export LD_LIBRARY_PATH="/host/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
-    echo "Added /host/usr/lib/aarch64-linux-gnu to LD_LIBRARY_PATH for VPI"
+    # Check if VPI libraries exist
+    if ls /host/usr/lib/aarch64-linux-gnu/libnvvpi* > /dev/null 2>&1; then
+        export LD_LIBRARY_PATH="/host/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
+        echo "Added /host/usr/lib/aarch64-linux-gnu to LD_LIBRARY_PATH for VPI"
+    fi
 fi
 
 # Check if VPI is accessible
