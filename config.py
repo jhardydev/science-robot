@@ -21,11 +21,13 @@ CAMERA_FPS = 60  # Increased for better responsiveness
 # MOTOR_RIGHT_PIN2 = 21
 # PWM_FREQUENCY = 1000  # Hz
 
-# Motor speeds (0.0 to 1.0)
-MOTOR_BASE_SPEED = 0.5
-MOTOR_TURN_SPEED = 0.6
-MOTOR_MAX_SPEED = 0.8
-MOTOR_DANCE_SPEED = 0.7
+# Motor speeds
+# Note: MOTOR_MAX_SPEED is in m/s (actual velocity for Duckiebot)
+# Other speeds (BASE, TURN, DANCE) are normalized (0.0 to 1.0) and scaled by MOTOR_MAX_SPEED
+MOTOR_BASE_SPEED = 0.5  # Normalized speed (0.0 to 1.0) - multiplied by MOTOR_MAX_SPEED for actual m/s
+MOTOR_TURN_SPEED = 0.6  # Normalized speed (0.0 to 1.0) - multiplied by MOTOR_MAX_SPEED for actual m/s
+MOTOR_MAX_SPEED = 0.8   # Maximum speed in m/s (Duckiebot typical max is 0.5-1.0 m/s)
+MOTOR_DANCE_SPEED = 0.7  # Normalized speed (0.0 to 1.0) - multiplied by MOTOR_MAX_SPEED for actual m/s
 
 # Wave detection parameters
 WAVE_DETECTION_FRAMES = 15  # Number of frames to analyze for wave detection
