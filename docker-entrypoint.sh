@@ -241,6 +241,104 @@ if [ -f /etc/fonts/fonts.conf ] && ! xmllint /etc/fonts/fonts.conf >/dev/null 2>
     echo "Warning: fonts.conf is invalid XML, fontconfig may complain"
 fi
 
+# Auto-start wheels driver node if not running
+ROBOT_NAME=${VEHICLE_NAME:-robot1}
+WHEELS_TOPIC="/${ROBOT_NAME}/wheels_driver_node/wheels_cmd"
+
+echo "Checking if wheels driver node is running..."
+# Check if topic has subscribers or if node is running
+WHEELS_RUNNING=false
+
+# Check if node exists
+if rostopic list > /dev/null 2>&1; then
+    if rosnode list 2>/dev/null | grep -q "wheels_driver_node"; then
+        echo "✓ wheels_driver_node is already running"
+        WHEELS_RUNNING=true
+    # Check if topic exists and has subscribers (topic exists means driver is running)
+    elif rostopic info "$WHEELS_TOPIC" > /dev/null 2>&1; then
+        # Topic exists - check if it has subscribers
+        topic_info=$(rostopic info "$WHEELS_TOPIC" 2>/dev/null)
+        if echo "$topic_info" | grep -q "Subscribers:"; then
+            echo "✓ wheels driver topic exists and has subscribers"
+            WHEELS_RUNNING=true
+        fi
+    fi
+fi
+
+if [ "$WHEELS_RUNNING" = false ]; then
+    echo "Starting wheels driver node..."
+    
+    # Try different methods to start the wheels driver
+    # Method 1: Try roslaunch (most common for Duckietown)
+    if command -v roslaunch > /dev/null 2>&1; then
+        # Try different possible launch file paths/names
+        LAUNCH_ATTEMPTS=(
+            "duckietown wheels_driver.launch veh:=$ROBOT_NAME"
+            "duckietown_demos wheels_driver.launch veh:=$ROBOT_NAME"
+            "dt-car-interface wheels_driver.launch veh:=$ROBOT_NAME"
+        )
+        
+        for launch_cmd in "${LAUNCH_ATTEMPTS[@]}"; do
+            echo "  Trying: roslaunch $launch_cmd"
+            roslaunch $launch_cmd > /dev/null 2>&1 &
+            WHEELS_PID=$!
+            sleep 2
+            
+            if kill -0 $WHEELS_PID 2>/dev/null; then
+                # Process is still running - check if node appeared
+                if rosnode list 2>/dev/null | grep -q "wheels_driver_node"; then
+                    echo "✓ wheels_driver_node started (PID: $WHEELS_PID)"
+                    WHEELS_RUNNING=true
+                    break
+                fi
+            fi
+            
+            # If process died, try next method
+            wait $WHEELS_PID 2>/dev/null || true
+        done
+    fi
+    
+    # Method 2: Try starting as ROS node directly (if wheels_driver executable exists)
+    if [ "$WHEELS_RUNNING" = false ] && command -v wheels_driver_node > /dev/null 2>&1; then
+        echo "  Trying: wheels_driver_node"
+        wheels_driver_node > /dev/null 2>&1 &
+        WHEELS_PID=$!
+        sleep 2
+        if kill -0 $WHEELS_PID 2>/dev/null && rosnode list 2>/dev/null | grep -q "wheels_driver_node"; then
+            echo "✓ wheels_driver_node started (PID: $WHEELS_PID)"
+            WHEELS_RUNNING=true
+        else
+            wait $WHEELS_PID 2>/dev/null || true
+        fi
+    fi
+    
+    # Wait a bit for topic to become available
+    if [ "$WHEELS_RUNNING" = true ]; then
+        echo "Waiting for wheels driver topic to become available..."
+        timeout=10
+        elapsed=0
+        while [ $elapsed -lt $timeout ]; do
+            if rostopic info "$WHEELS_TOPIC" > /dev/null 2>&1; then
+                echo "✓ Wheels driver topic is available: $WHEELS_TOPIC"
+                break
+            fi
+            sleep 0.5
+            elapsed=$((elapsed + 1))
+        done
+        
+        if [ $elapsed -ge $timeout ]; then
+            echo "⚠ Topic not available after ${timeout}s, but node may still be starting"
+        fi
+    else
+        echo "⚠ Could not start wheels driver automatically"
+        echo "  You may need to start it manually:"
+        echo "  roslaunch duckietown wheels_driver.launch veh:=$ROBOT_NAME"
+        echo "  Or: roslaunch duckietown_demos wheels_driver.launch veh:=$ROBOT_NAME"
+    fi
+else
+    echo "✓ Wheels driver is ready"
+fi
+
 # Execute the command
 echo "Starting application: $@"
 exec "$@"
