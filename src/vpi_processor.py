@@ -91,22 +91,52 @@ class VPIProcessor:
         try:
             # Convert numpy array to VPI image
             vpi_img = vpi.asimage(image)
+            original_height, original_width = vpi_img.size[1], vpi_img.size[0]
             
-            # VPI uses Scale algorithm for resizing
+            # Calculate scale factors
+            scale_x = target_width / original_width
+            scale_y = target_height / original_height
+            
+            # VPI uses Conversion with HomographyTransform2D for resizing
             # Try different possible API patterns
             resized = None
             try:
-                # Try vpi.Scale (algorithm-based API)
-                resized = vpi.Scale(vpi_img, (target_width, target_height), 
-                                   interp=vpi.Interp.LINEAR, backend=self.vpi_backend)
-            except (AttributeError, TypeError):
+                # Method 1: Try Conversion with scale transform
+                # Create a homography transform for scaling
+                scale_transform = vpi.HomographyTransform2D([scale_x, 0, 0, 
+                                                             0, scale_y, 0, 
+                                                             0, 0, 1])
+                
+                # Create output image with target size
+                output_img = vpi.Image((target_width, target_height), vpi_img.format)
+                
+                # Apply conversion
+                conv = vpi.Conversion(vpi_img, output_img, scale_transform, 
+                                     interp=vpi.Interp.LINEAR, backend=self.vpi_backend)
+                vpi.execute(conv)
+                resized = output_img
+            except (AttributeError, TypeError) as e1:
                 try:
-                    # Try direct resize if available (older API)
-                    resized = vpi.resize(vpi_img, (target_width, target_height), 
-                                       interp=vpi.Interp.LINEAR, backend=self.vpi_backend)
-                except AttributeError:
-                    # VPI resize not available - fall back to CPU
-                    raise AttributeError("VPI resize API not available")
+                    # Method 2: Try if Image object has resize method
+                    if hasattr(vpi_img, 'resize'):
+                        resized = vpi_img.resize((target_width, target_height), 
+                                                interp=vpi.Interp.LINEAR, 
+                                                backend=self.vpi_backend)
+                    else:
+                        raise AttributeError("No resize method found")
+                except (AttributeError, TypeError) as e2:
+                    # Method 3: Try Conversion without explicit transform (simpler API)
+                    try:
+                        output_img = vpi.Image((target_width, target_height), vpi_img.format)
+                        conv = vpi.Conversion(vpi_img, output_img, 
+                                             interp=vpi.Interp.LINEAR, 
+                                             backend=self.vpi_backend)
+                        vpi.execute(conv)
+                        resized = output_img
+                    except Exception as e3:
+                        # VPI resize not available - fall back to CPU
+                        logger.debug(f"VPI resize attempts failed: {e1}, {e2}, {e3}")
+                        raise AttributeError("VPI resize API not available")
             
             # Convert back to numpy
             return resized.cpu()
@@ -134,7 +164,19 @@ class VPIProcessor:
         
         try:
             vpi_img = vpi.asimage(image)
-            blurred = vpi.Gaussian(vpi_img, kernel_size, sigma, backend=self.vpi_backend)
+            # VPI Gaussian might be available as a filter method on the image
+            # Try different API patterns
+            blurred = None
+            try:
+                # Try if Gaussian is a top-level function
+                blurred = vpi.Gaussian(vpi_img, kernel_size, sigma, backend=self.vpi_backend)
+            except (AttributeError, TypeError):
+                # Try if it's a method on the image object
+                if hasattr(vpi_img, 'gaussian'):
+                    blurred = vpi_img.gaussian(kernel_size, sigma, backend=self.vpi_backend)
+                else:
+                    # Fallback: VPI may not have Gaussian - use CPU
+                    raise AttributeError("VPI Gaussian not available")
             return blurred.cpu()
         except Exception as e:
             logger.warning(f"VPI blur error: {e}, falling back to CPU")

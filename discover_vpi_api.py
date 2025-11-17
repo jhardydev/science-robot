@@ -60,9 +60,29 @@ try:
     
     # Check what methods are available on VPI image
     img_methods = [m for m in dir(vpi_img) if not m.startswith('_')]
-    print(f"  VPI image methods: {', '.join(img_methods[:10])}...")  # Show first 10
+    print(f"  All VPI image methods ({len(img_methods)}):")
+    for method in sorted(img_methods):
+        print(f"    - {method}")
+    
+    # Check specifically for resize/scale operations
+    resize_methods = [m for m in img_methods if 'resize' in m.lower() or 'scale' in m.lower()]
+    if resize_methods:
+        print(f"\n  ✓ Resize/scale methods found: {', '.join(resize_methods)}")
+    else:
+        print(f"\n  ✗ No resize/scale methods found on VPI Image object")
+        
+    # Check Conversion class
+    print("\nChecking Conversion class:")
+    try:
+        conv_methods = [m for m in dir(vpi.Conversion) if not m.startswith('_')]
+        print(f"  Conversion methods: {', '.join(conv_methods)}")
+    except:
+        print("  Could not inspect Conversion class")
+        
 except Exception as e:
     print(f"  ✗ Error testing VPI image: {e}")
+    import traceback
+    traceback.print_exc()
 
 print("-" * 50)
 print("Discovery complete!")
