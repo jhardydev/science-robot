@@ -56,22 +56,61 @@ X11 forwarding allows you to display GUI applications from the robot on your loc
 
 ### SSH Client Configuration (on Your Machine)
 
-**Connect with X11 forwarding:**
+**1. Start X11 server on your local machine:**
+
+**macOS:**
+- Open XQuartz (Applications > Utilities > XQuartz)
+- In XQuartz preferences, go to "Security" tab
+- Check "Allow connections from network clients"
+- Restart XQuartz
+- You may need to restart your computer after first installing XQuartz
+
+**Linux:**
+- X11 server should already be running
+- If not: `sudo systemctl start display-manager` (or your display manager)
+
+**2. Connect with X11 forwarding:**
 ```bash
 ssh -X username@robot-ip
 # Or with trusted forwarding (less secure but more compatible):
 ssh -Y username@robot-ip
 ```
 
-**Test X11 forwarding:**
+**3. Verify DISPLAY is set:**
 ```bash
-# After SSH'd into robot, test with:
+# After SSH'd into robot, check:
+echo $DISPLAY
+# Should show something like: localhost:10.0 or localhost:11.0
+```
+
+**4. Test X11 forwarding:**
+```bash
+# If DISPLAY is not set, try:
+export DISPLAY=localhost:10.0
+# Or check what it should be:
+echo $DISPLAY
+
+# Then test:
 xeyes
 # Or:
 xclock
 ```
 
 If you see a window appear on your local machine, X11 forwarding is working!
+
+**5. If DISPLAY is still not set:**
+```bash
+# Check if X11 forwarding is enabled in SSH connection:
+ssh -v -X username@robot-ip
+# Look for lines like:
+# debug1: Requesting X11 forwarding with authentication spoofing.
+# debug1: Requesting authentication agent forwarding.
+
+# Check SSH server config on robot:
+grep -i x11 /etc/ssh/sshd_config
+# Should show:
+# X11Forwarding yes
+```
 
 ### Running the Container with X11 Forwarding
 
@@ -97,6 +136,61 @@ If you see a window appear on your local machine, X11 forwarding is working!
 
 ### Troubleshooting X11 Forwarding
 
+**"Can't open display:" or DISPLAY not set:**
+1. **Check if DISPLAY is set:**
+   ```bash
+   echo $DISPLAY
+   # If empty, try:
+   export DISPLAY=localhost:10.0
+   # Or check what SSH set:
+   ssh -v -X username@robot-ip 2>&1 | grep -i display
+   ```
+
+2. **Verify XQuartz is running (macOS):**
+   - Open XQuartz application
+   - Check XQuartz preferences > Security > "Allow connections from network clients"
+   - Restart XQuartz and try again
+
+3. **Check SSH X11 forwarding is working:**
+   ```bash
+   # On your local machine, before SSH:
+   echo $DISPLAY
+   # Should show your local display (e.g., /private/tmp/com.apple.launchd.xxx/org.xquartz:0)
+   
+   # After SSH with -X:
+   ssh -X username@robot-ip
+   echo $DISPLAY
+   # Should show something like localhost:10.0
+   ```
+
+4. **Verify SSH server config:**
+   ```bash
+   # On robot:
+   sudo grep -i x11 /etc/ssh/sshd_config
+   # Should show:
+   # X11Forwarding yes
+   # X11DisplayOffset 10
+   # X11UseLocalhost yes
+   
+   # If not, edit and restart:
+   sudo nano /etc/ssh/sshd_config
+   sudo systemctl restart sshd
+   ```
+
+5. **Check xauth is installed:**
+   ```bash
+   # On robot:
+   which xauth
+   # If not found:
+   sudo apt-get install xauth
+   ```
+
+6. **Try trusted forwarding:**
+   ```bash
+   ssh -Y username@robot-ip
+   # -Y is less secure but more permissive
+   ```
+
 **"Cannot connect to X server" error:**
 - Make sure XQuartz/X server is running on your local machine
 - Check `echo $DISPLAY` - should be something like `localhost:10.0`
@@ -105,12 +199,20 @@ If you see a window appear on your local machine, X11 forwarding is working!
 
 **"X11 connection rejected" error:**
 - Check SSH server config has `X11Forwarding yes`
-- Restart SSH service on robot
+- Restart SSH service on robot: `sudo systemctl restart sshd`
 - Try `ssh -Y` instead of `ssh -X` (trusted forwarding)
+- Check XQuartz security settings allow network connections
 
 **"Bad display name" error:**
 - Set `export DISPLAY=localhost:10.0` before running container
 - Or use `-e DISPLAY=$DISPLAY` in docker-run.sh
+- Verify with: `xhost +localhost` (less secure, for testing only)
+
+**"No protocol specified" error:**
+- X11 authentication issue
+- Try: `xauth list` to see available auth entries
+- May need to restart SSH connection
+- On macOS, ensure XQuartz security allows network clients
 
 ## Option 2: VNC (Virtual Display)
 
