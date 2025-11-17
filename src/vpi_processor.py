@@ -19,27 +19,57 @@ except ImportError:
 class VPIProcessor:
     """GPU-accelerated image processing using NVIDIA VPI"""
     
-    def __init__(self, backend='GPU'):
+    def __init__(self, backend='CUDA'):
         """
         Initialize VPI processor
         
         Args:
-            backend: VPI backend ('GPU', 'CPU', or 'VIC')
+            backend: VPI backend ('CUDA', 'CPU', 'VIC', 'PVA', or 'OFA')
+                     Note: 'GPU' is accepted as alias for 'CUDA'
         """
         self.available = VPI_AVAILABLE
         self.backend = backend
         
         if self.available:
-            # Convert string to VPI backend enum
+            # Map user-friendly backend names to VPI backend enums
+            # VPI uses CUDA for GPU acceleration, not 'GPU'
             backend_map = {
-                'GPU': vpi.Backend.GPU,
+                'CUDA': vpi.Backend.CUDA,  # GPU acceleration
+                'GPU': vpi.Backend.CUDA,   # Alias for CUDA (backward compatibility)
                 'CPU': vpi.Backend.CPU,
-                'VIC': vpi.Backend.VIC
+                'VIC': vpi.Backend.VIC,    # Video Image Compositor
+                'PVA': vpi.Backend.PVA,    # Programmable Vision Accelerator
+                'OFA': vpi.Backend.OFA     # Optical Flow Accelerator
             }
-            self.vpi_backend = backend_map.get(backend, vpi.Backend.GPU)
-            logger.info(f"VPI processor initialized with {backend} backend")
+            
+            # Normalize backend name (handle case variations)
+            backend_upper = backend.upper()
+            if backend_upper not in backend_map:
+                logger.warning(f"Unknown VPI backend '{backend}', defaulting to CUDA")
+                backend_upper = 'CUDA'
+            
+            # Use getattr to safely access backend attributes
+            backend_enum = None
+            for attempt_name in [backend_upper, 'CUDA', 'CPU']:
+                backend_attr = getattr(vpi.Backend, attempt_name, None)
+                if backend_attr is not None:
+                    backend_enum = backend_attr
+                    if attempt_name != backend_upper:
+                        logger.warning(f"Requested backend '{backend_upper}' not available, using '{attempt_name}'")
+                    break
+            
+            if backend_enum is None:
+                logger.error("No VPI backends available. VPI installation may be incomplete.")
+                self.vpi_backend = None
+                self.available = False
+            else:
+                self.vpi_backend = backend_enum
+                # Log the actual backend name (not alias)
+                actual_backend = 'CUDA' if backend_upper == 'GPU' else backend_upper
+                logger.info(f"VPI processor initialized with {actual_backend} backend")
         else:
             logger.warning("VPI processor unavailable - using CPU fallback. Install JetPack for VPI support.")
+            self.vpi_backend = None
     
     def resize_gpu(self, image, target_width, target_height):
         """
@@ -131,4 +161,27 @@ class VPIProcessor:
     def is_available(self):
         """Check if VPI is available"""
         return self.available
+    
+    def get_available_backends(self):
+        """
+        Get list of available VPI backends
+        
+        Returns:
+            List of available backend names, or empty list if VPI unavailable
+        """
+        if not self.available:
+            return []
+        
+        available = []
+        backend_names = ['CPU', 'CUDA', 'VIC', 'PVA', 'OFA']
+        
+        for name in backend_names:
+            try:
+                backend_attr = getattr(vpi.Backend, name, None)
+                if backend_attr is not None:
+                    available.append(name)
+            except AttributeError:
+                pass
+        
+        return available
 

@@ -73,7 +73,8 @@ ENABLE_FILE_LOGGING = os.getenv('ENABLE_FILE_LOGGING', 'True').lower() == 'true'
 # NVIDIA acceleration settings
 USE_CUDA_ACCELERATION = True  # Use CUDA-accelerated OpenCV if available
 USE_VPI_ACCELERATION = True   # Use VPI for GPU-accelerated image processing
-VPI_BACKEND = 'GPU'           # VPI backend: 'GPU', 'CPU', or 'VIC'
+VPI_BACKEND = 'CUDA'          # VPI backend: 'CUDA' (GPU), 'CPU', 'VIC', 'PVA', or 'OFA'
+                              # Note: 'GPU' is accepted as alias for 'CUDA'
 GPU_PREPROCESSING = True       # Use GPU for image preprocessing
 
 # Performance monitoring
