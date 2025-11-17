@@ -23,8 +23,15 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     xvfb \
     x11vnc \
+    fontconfig-config \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+    
+# Fix fontconfig warnings by ensuring proper config
+RUN mkdir -p /etc/fonts/conf.d && \
+    if [ ! -f /etc/fonts/fonts.conf ]; then \
+        fc-cache -f 2>/dev/null || true; \
+    fi
 
 # Try to install VPI if available (may not be in all base images)
 # VPI is typically part of NVIDIA JetPack SDK on Jetson devices

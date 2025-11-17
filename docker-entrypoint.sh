@@ -158,21 +158,45 @@ fi
 # Only add specific VPI paths, not entire dist-packages (avoids conflicts)
 
 # Find VPI package in mounted paths
-VPI_PATHS=(
-    "/host/usr/lib/python3/dist-packages/vpi"
-    "/host/usr/local/lib/python3/dist-packages/vpi"
-)
+VPI_FOUND=false
 
-for VPI_PATH in "${VPI_PATHS[@]}"; do
-    if [ -d "$VPI_PATH" ] || [ -f "${VPI_PATH}.py" ]; then
-        VPI_PARENT=$(dirname "$VPI_PATH" 2>/dev/null || echo "")
-        if [ -n "$VPI_PARENT" ] && [ -d "$VPI_PARENT" ]; then
-            export PYTHONPATH="$VPI_PARENT:$PYTHONPATH"
-            echo "Added $VPI_PARENT to PYTHONPATH for VPI"
-            break
-        fi
+# Check if VPI_PARENT_DIR was set by docker-run.sh
+if [ -n "$VPI_PARENT_DIR" ]; then
+    HOST_VPI_PARENT="/host$VPI_PARENT_DIR"
+    if [ -d "$HOST_VPI_PARENT" ]; then
+        export PYTHONPATH="$HOST_VPI_PARENT:$PYTHONPATH"
+        echo "Added $HOST_VPI_PARENT to PYTHONPATH for VPI (from VPI_PARENT_DIR)"
+        VPI_FOUND=true
     fi
-done
+fi
+
+# Also try common paths if not found yet
+if [ "$VPI_FOUND" = false ]; then
+    VPI_PATHS=(
+        "/host/usr/lib/python3/dist-packages/vpi"
+        "/host/usr/local/lib/python3/dist-packages/vpi"
+        "/usr/lib/python3/dist-packages/vpi"
+    )
+    
+    for VPI_PATH in "${VPI_PATHS[@]}"; do
+        if [ -d "$VPI_PATH" ] || [ -f "${VPI_PATH}.py" ]; then
+            VPI_PARENT=$(dirname "$VPI_PATH" 2>/dev/null || echo "")
+            # If path starts with /host, use it directly; otherwise prepend /host
+            if [[ "$VPI_PARENT" == /host/* ]]; then
+                HOST_PARENT="$VPI_PARENT"
+            else
+                HOST_PARENT="/host$VPI_PARENT"
+            fi
+            
+            if [ -n "$HOST_PARENT" ] && [ -d "$HOST_PARENT" ]; then
+                export PYTHONPATH="$HOST_PARENT:$PYTHONPATH"
+                echo "Added $HOST_PARENT to PYTHONPATH for VPI"
+                VPI_FOUND=true
+                break
+            fi
+        fi
+    done
+fi
 
 # Add VPI library paths to LD_LIBRARY_PATH
 if [ -d /host/usr/lib/aarch64-linux-gnu ]; then
@@ -190,6 +214,9 @@ else
     echo "⚠ VPI not accessible in container (will use CPU fallback)"
     echo "  Note: VPI requires JetPack SDK and may need to be mounted from host"
 fi
+
+# Suppress fontconfig warnings (they're harmless but noisy)
+export FONTCONFIG_FILE=/etc/fonts/fonts.conf 2>/dev/null || true
 
 # Execute the command
 echo "Starting application: $@"

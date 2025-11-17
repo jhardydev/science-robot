@@ -152,14 +152,16 @@ if [ -n "$VPI_PYTHON_PATH" ] && [ -d "$VPI_PYTHON_PATH" ]; then
     echo "Mounting VPI Python package: $VPI_PYTHON_PATH -> /host$VPI_PYTHON_PATH"
     VPI_MOUNTED=true
     
-    # Also need to mount parent directory for Python to find the package
-    # But only add it to PYTHONPATH, don't mount entire dist-packages
+    # Also need parent directory in PYTHONPATH so Python can find it
+    # We'll add this to PYTHONPATH in entrypoint, not mount entire dist-packages
     VPI_PARENT=$(dirname "$VPI_PYTHON_PATH" 2>/dev/null || echo "")
-    if [ -n "$VPI_PARENT" ] && [ "$VPI_PARENT" != "/usr/lib/python3/dist-packages" ]; then
-        # If parent is a subdirectory, mount it too
-        VOLUME_MOUNTS+=(-v "$VPI_PARENT:/host$VPI_PARENT:ro")
-        echo "Mounting VPI parent directory: $VPI_PARENT"
+    if [ -n "$VPI_PARENT" ]; then
+        # Export parent path for entrypoint to use
+        export VPI_PARENT_DIR="$VPI_PARENT"
+        echo "VPI parent directory for PYTHONPATH: $VPI_PARENT"
     fi
+else
+    echo "VPI not found via Python import - trying file system search..."
 fi
 
 # Method 2: Try common installation paths (if import failed)
