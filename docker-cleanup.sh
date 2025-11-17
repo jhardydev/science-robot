@@ -14,6 +14,7 @@ NC='\033[0m' # No Color
 CLEAN_CONTAINERS=true
 CLEAN_IMAGE=false
 CLEAN_VOLUMES=false
+CLEAN_DANGLING=false
 CLEAN_ALL=false
 FORCE=false
 
@@ -30,6 +31,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --volumes)
             CLEAN_VOLUMES=true
+            shift
+            ;;
+        --dangling)
+            CLEAN_DANGLING=true
             shift
             ;;
         --all)
@@ -49,7 +54,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --containers    Remove stopped containers (default)"
             echo "  --image         Remove science-robot Docker image"
             echo "  --volumes       Remove associated volumes"
-            echo "  --all           Remove containers, image, and volumes"
+            echo "  --dangling      Remove dangling (untagged) images"
+            echo "  --all           Remove containers, image, volumes, and dangling images"
             echo "  --force         Skip confirmation prompts"
             echo "  --help          Show this help message"
             echo ""
@@ -75,6 +81,7 @@ if [ "$CLEAN_ALL" = true ]; then
     CLEAN_CONTAINERS=true
     CLEAN_IMAGE=true
     CLEAN_VOLUMES=true
+    CLEAN_DANGLING=true
 fi
 
 # Clean up containers
@@ -136,21 +143,38 @@ if [ "$CLEAN_IMAGE" = true ]; then
     else
         echo -e "${GREEN}No image to remove${NC}"
     fi
+fi
+
+# Clean up dangling images (untagged/intermediate images from failed builds)
+if [ "$CLEAN_DANGLING" = true ]; then
+    echo ""
+    echo -e "${YELLOW}Checking for dangling images...${NC}"
     
-    # Also check for dangling images
-    DANGLING=$(docker images -f "dangling=true" -q 2>/dev/null | wc -l)
-    if [ "$DANGLING" -gt 0 ]; then
+    # Count dangling images
+    DANGLING_COUNT=$(docker images -f "dangling=true" -q 2>/dev/null | wc -l || echo "0")
+    
+    if [ "$DANGLING_COUNT" -gt 0 ]; then
+        # Calculate space that will be freed
+        DANGLING_SIZE=$(docker images -f "dangling=true" --format "{{.Size}}" 2>/dev/null | \
+            awk '{sum+=$1} END {print sum}' || echo "0")
+        
         if [ "$FORCE" = false ]; then
-            read -p "Remove $DANGLING dangling images? (y/n) " -n 1 -r
+            echo -e "${YELLOW}Found $DANGLING_COUNT dangling image(s)${NC}"
+            read -p "Remove all dangling images? (y/n) " -n 1 -r
             echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                docker image prune -f
-                echo -e "${GREEN}Dangling images removed${NC}"
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                echo "Skipping dangling image cleanup"
+                CLEAN_DANGLING=false
             fi
-        else
-            docker image prune -f
-            echo -e "${GREEN}Dangling images removed${NC}"
         fi
+        
+        if [ "$CLEAN_DANGLING" = true ]; then
+            echo -e "${YELLOW}Removing dangling images...${NC}"
+            docker image prune -f
+            echo -e "${GREEN}Removed $DANGLING_COUNT dangling image(s)${NC}"
+        fi
+    else
+        echo -e "${GREEN}No dangling images found${NC}"
     fi
 fi
 
