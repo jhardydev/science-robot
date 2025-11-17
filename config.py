@@ -52,7 +52,9 @@ DANCE_MOVE_DURATION = 1.0  # Duration of each dance move in seconds
 
 # Main loop settings
 MAIN_LOOP_FPS = 30
-DISPLAY_OUTPUT = True  # Show camera feed with overlays
+# Disable display output by default in container (headless mode)
+# Set to True only if you have X11 forwarding set up
+DISPLAY_OUTPUT = os.getenv('DISPLAY_OUTPUT', 'False').lower() == 'true'  # Auto-detect or use env var
 
 # Debug settings
 DEBUG_MODE = False

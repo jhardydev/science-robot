@@ -160,18 +160,23 @@ class RobotController:
                 
                 # Display output if enabled
                 if config.DISPLAY_OUTPUT:
-                    self._draw_overlay(frame, mp_results, is_waving, wave_position)
-                    cv2.imshow('Duckiebot Science Fair Robot', frame)
-                    
-                    # Handle key presses
-                    key = cv2.waitKey(1) & 0xFF
-                    if key == ord('q'):
-                        print("Quit requested")
-                        break
-                    elif key == ord('s'):
-                        print("Emergency stop!")
-                        self.motor_controller.emergency_stop()
-                        self.state = 'idle'
+                    try:
+                        self._draw_overlay(frame, mp_results, is_waving, wave_position)
+                        cv2.imshow('Duckiebot Science Fair Robot', frame)
+                        
+                        # Handle key presses
+                        key = cv2.waitKey(1) & 0xFF
+                        if key == ord('q'):
+                            print("Quit requested")
+                            break
+                        elif key == ord('s'):
+                            print("Emergency stop!")
+                            self.motor_controller.emergency_stop()
+                            self.state = 'idle'
+                    except Exception as e:
+                        # If display fails, disable display output
+                        rospy.logwarn(f"Display output failed: {e}, disabling display")
+                        config.DISPLAY_OUTPUT = False
                 
                 # Maintain target FPS
                 elapsed = time.time() - loop_start

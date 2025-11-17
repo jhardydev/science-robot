@@ -72,6 +72,15 @@ if [ "$ROS_AVAILABLE" = false ]; then
     echo "The application may fail if ROS topics are not accessible."
 fi
 
+# Set Qt to use offscreen platform for headless operation
+export QT_QPA_PLATFORM=offscreen
+# Disable X11 if not available
+if [ -z "$DISPLAY" ] || [ ! -e /tmp/.X11-unix ]; then
+    echo "No X11 display available, running in headless mode"
+    export DISPLAY_OUTPUT=false
+    export QT_QPA_PLATFORM=offscreen
+fi
+
 # Execute the command
 echo "Starting application: $@"
 exec "$@"
