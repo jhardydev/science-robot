@@ -138,6 +138,42 @@ VOLUME_MOUNTS=(
     -v "$LOG_DIR:/code/logs"
 )
 
+# Mount VPI libraries from host (if available on Jetson)
+# VPI is typically installed as part of JetPack SDK
+# Try to find VPI via Python first (most reliable)
+VPI_MOUNTED=false
+
+# Method 1: Try to find VPI via Python import
+VPI_PYTHON_PATH=$(python3 -c "import vpi; import os; print(os.path.dirname(vpi.__file__))" 2>/dev/null || echo "")
+if [ -n "$VPI_PYTHON_PATH" ] && [ -d "$VPI_PYTHON_PATH" ]; then
+    echo "Found VPI Python package via import: $VPI_PYTHON_PATH"
+    VPI_PACKAGE_DIR=$(dirname "$VPI_PYTHON_PATH" 2>/dev/null || echo "")
+    if [ -n "$VPI_PACKAGE_DIR" ] && [ -d "$VPI_PACKAGE_DIR" ]; then
+        VOLUME_MOUNTS+=(-v "$VPI_PACKAGE_DIR:/host$VPI_PACKAGE_DIR:ro")
+        echo "Mounting VPI Python package directory: $VPI_PACKAGE_DIR -> /host$VPI_PACKAGE_DIR"
+        VPI_MOUNTED=true
+    fi
+fi
+
+# Method 2: Try common installation paths
+if [ "$VPI_MOUNTED" = false ]; then
+    # Mount entire dist-packages directory (contains VPI)
+    if [ -d "/usr/lib/python3/dist-packages" ]; then
+        VOLUME_MOUNTS+=(-v "/usr/lib/python3/dist-packages:/host/usr/lib/python3/dist-packages:ro")
+        echo "Mounting Python dist-packages from: /usr/lib/python3/dist-packages"
+        VPI_MOUNTED=true
+    fi
+fi
+
+# Mount VPI shared libraries
+if [ -d "/usr/lib/aarch64-linux-gnu" ]; then
+    # Check if VPI libraries exist
+    if ls /usr/lib/aarch64-linux-gnu/libnvvpi* > /dev/null 2>&1; then
+        VOLUME_MOUNTS+=(-v "/usr/lib/aarch64-linux-gnu:/host/usr/lib/aarch64-linux-gnu:ro")
+        echo "Mounting aarch64 libraries from: /usr/lib/aarch64-linux-gnu"
+    fi
+fi
+
 # Add X11 mounts if not using virtual display
 if [ "$USE_VIRTUAL_DISPLAY" != "true" ] && [ -n "$DISPLAY" ] && [ -e /tmp/.X11-unix ]; then
     VOLUME_MOUNTS+=(-v /tmp/.X11-unix:/tmp/.X11-unix:rw)
@@ -155,6 +191,9 @@ ENV_VARS=(
     -e DISPLAY_OUTPUT="$DISPLAY_OUTPUT"
     -e ENABLE_VNC="$ENABLE_VNC"
     -e VNC_PORT="$VNC_PORT"
+    # Pass through NVIDIA runtime for GPU access
+    -e NVIDIA_VISIBLE_DEVICES=all
+    -e NVIDIA_DRIVER_CAPABILITIES=compute,utility
 )
 
 # Add DISPLAY if not using virtual display
@@ -171,9 +210,24 @@ if [ "$ENABLE_VNC" = "true" ]; then
     echo "  SSH tunnel: ssh -L ${VNC_PORT}:localhost:${VNC_PORT} user@robot-ip"
 fi
 
+# Check for GPU support (NVIDIA runtime)
+GPU_FLAG=""
+if command -v nvidia-smi > /dev/null 2>&1; then
+    # Try --gpus flag first (newer Docker)
+    if docker run --help 2>&1 | grep -q "\-\-gpus"; then
+        GPU_FLAG="--gpus all"
+        echo "Using --gpus all for GPU access"
+    # Fall back to --runtime=nvidia (older Docker)
+    elif docker info 2>&1 | grep -q "nvidia"; then
+        GPU_FLAG="--runtime=nvidia"
+        echo "Using --runtime=nvidia for GPU access"
+    fi
+fi
+
 docker run -it --rm \
     --name science-robot \
     --network host \
+    $GPU_FLAG \
     "${PORT_MAPPINGS[@]}" \
     "${ENV_VARS[@]}" \
     "${VOLUME_MOUNTS[@]}" \

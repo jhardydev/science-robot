@@ -153,6 +153,27 @@ else
     unset QT_QPA_PLATFORM
 fi
 
+# Setup VPI library paths (if VPI is mounted from host)
+# VPI may be mounted in /host paths, need to add to PYTHONPATH and LD_LIBRARY_PATH
+if [ -d /host/usr/lib/python3/dist-packages ]; then
+    export PYTHONPATH="/host/usr/lib/python3/dist-packages:$PYTHONPATH"
+    echo "Added /host/usr/lib/python3/dist-packages to PYTHONPATH for VPI"
+fi
+
+# Add VPI library paths to LD_LIBRARY_PATH
+if [ -d /host/usr/lib/aarch64-linux-gnu ]; then
+    export LD_LIBRARY_PATH="/host/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
+    echo "Added /host/usr/lib/aarch64-linux-gnu to LD_LIBRARY_PATH for VPI"
+fi
+
+# Check if VPI is accessible
+if python3 -c "import vpi" 2>/dev/null; then
+    echo "✓ VPI is accessible in container"
+else
+    echo "⚠ VPI not accessible in container (will use CPU fallback)"
+    echo "  Note: VPI requires JetPack SDK and may need to be mounted from host"
+fi
+
 # Execute the command
 echo "Starting application: $@"
 exec "$@"
