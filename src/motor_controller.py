@@ -26,14 +26,28 @@ class MotorController:
             latch=False  # Don't latch - send fresh commands each time
         )
         
-        # Wait a moment for publisher to connect
+        # Wait a moment for publisher to advertise
         rospy.sleep(0.2)
         
-        # Check if publisher has subscribers (motor driver is listening)
+        # Publish an initial zero-speed command to establish connection
+        # ROS uses "lazy connections" - subscribers only connect when first message is published
+        # This triggers the connection with any existing subscribers (wheels_driver_node)
+        zero_msg = WheelsCmdStamped()
+        zero_msg.header = Header()
+        zero_msg.header.stamp = rospy.Time.now()
+        zero_msg.vel_left = 0.0
+        zero_msg.vel_right = 0.0
+        self.wheels_pub.publish(zero_msg)
+        
+        # Give ROS time to establish the connection after first message
+        rospy.sleep(0.2)
+        
+        # NOW check for subscribers (should be accurate after publishing)
         subscriber_count = self.wheels_pub.get_num_connections()
         if subscriber_count == 0:
             rospy.logwarn(f"Motor command topic '{config.MOTOR_TOPIC}' has no subscribers!")
             rospy.logwarn("  Make sure the wheels_driver_node is running")
+            rospy.logwarn("  Note: Connection is established when first message is published")
         else:
             rospy.loginfo(f"Motor command topic has {subscriber_count} subscriber(s)")
         
