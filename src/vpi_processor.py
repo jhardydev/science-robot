@@ -3,12 +3,17 @@ VPI (Vision Programming Interface) module for GPU-accelerated image processing
 Provides GPU-accelerated operations for better performance on Jetson Nano
 """
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
+
 try:
     import vpi
     VPI_AVAILABLE = True
 except ImportError:
     VPI_AVAILABLE = False
-    print("Warning: VPI not available. Install JetPack for VPI support.")
+    # Don't log here - logger may not be configured yet
+    pass
 
 
 class VPIProcessor:
@@ -32,9 +37,9 @@ class VPIProcessor:
                 'VIC': vpi.Backend.VIC
             }
             self.vpi_backend = backend_map.get(backend, vpi.Backend.GPU)
-            print(f"VPI processor initialized with {backend} backend")
+            logger.info(f"VPI processor initialized with {backend} backend")
         else:
-            print("VPI processor unavailable - using CPU fallback")
+            logger.warning("VPI processor unavailable - using CPU fallback. Install JetPack for VPI support.")
     
     def resize_gpu(self, image, target_width, target_height):
         """
@@ -64,7 +69,7 @@ class VPIProcessor:
             # Convert back to numpy
             return resized.cpu()
         except Exception as e:
-            print(f"VPI resize error: {e}, falling back to CPU")
+            logger.warning(f"VPI resize error: {e}, falling back to CPU")
             import cv2
             return cv2.resize(image, (target_width, target_height))
     
@@ -90,7 +95,7 @@ class VPIProcessor:
             blurred = vpi.Gaussian(vpi_img, kernel_size, sigma, backend=self.vpi_backend)
             return blurred.cpu()
         except Exception as e:
-            print(f"VPI blur error: {e}, falling back to CPU")
+            logger.warning(f"VPI blur error: {e}, falling back to CPU")
             import cv2
             return cv2.GaussianBlur(image, (kernel_size, kernel_size), sigma)
     
@@ -119,7 +124,7 @@ class VPIProcessor:
             import cv2
             return cv2.cvtColor(image, conversion_code)
         except Exception as e:
-            print(f"VPI color conversion error: {e}, falling back to CPU")
+            logger.warning(f"VPI color conversion error: {e}, falling back to CPU")
             import cv2
             return cv2.cvtColor(image, conversion_code)
     
