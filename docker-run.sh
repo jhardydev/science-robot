@@ -140,32 +140,44 @@ VOLUME_MOUNTS=(
 
 # Mount VPI libraries from host (if available on Jetson)
 # VPI is typically installed as part of JetPack SDK
-# Try to find VPI via Python first (most reliable)
+# Only mount VPI package specifically, not entire dist-packages (avoids numpy conflicts)
 VPI_MOUNTED=false
 
-# Method 1: Try to find VPI via Python import
+# Method 1: Try to find VPI via Python import (most reliable)
 VPI_PYTHON_PATH=$(python3 -c "import vpi; import os; print(os.path.dirname(vpi.__file__))" 2>/dev/null || echo "")
 if [ -n "$VPI_PYTHON_PATH" ] && [ -d "$VPI_PYTHON_PATH" ]; then
     echo "Found VPI Python package via import: $VPI_PYTHON_PATH"
-    VPI_PACKAGE_DIR=$(dirname "$VPI_PYTHON_PATH" 2>/dev/null || echo "")
-    if [ -n "$VPI_PACKAGE_DIR" ] && [ -d "$VPI_PACKAGE_DIR" ]; then
-        VOLUME_MOUNTS+=(-v "$VPI_PACKAGE_DIR:/host$VPI_PACKAGE_DIR:ro")
-        echo "Mounting VPI Python package directory: $VPI_PACKAGE_DIR -> /host$VPI_PACKAGE_DIR"
-        VPI_MOUNTED=true
+    # Mount only the VPI package directory, not parent dist-packages
+    VOLUME_MOUNTS+=(-v "$VPI_PYTHON_PATH:/host$VPI_PYTHON_PATH:ro")
+    echo "Mounting VPI Python package: $VPI_PYTHON_PATH -> /host$VPI_PYTHON_PATH"
+    VPI_MOUNTED=true
+    
+    # Also need to mount parent directory for Python to find the package
+    # But only add it to PYTHONPATH, don't mount entire dist-packages
+    VPI_PARENT=$(dirname "$VPI_PYTHON_PATH" 2>/dev/null || echo "")
+    if [ -n "$VPI_PARENT" ] && [ "$VPI_PARENT" != "/usr/lib/python3/dist-packages" ]; then
+        # If parent is a subdirectory, mount it too
+        VOLUME_MOUNTS+=(-v "$VPI_PARENT:/host$VPI_PARENT:ro")
+        echo "Mounting VPI parent directory: $VPI_PARENT"
     fi
 fi
 
-# Method 2: Try common installation paths
+# Method 2: Try common installation paths (if import failed)
 if [ "$VPI_MOUNTED" = false ]; then
-    # Mount entire dist-packages directory (contains VPI)
-    if [ -d "/usr/lib/python3/dist-packages" ]; then
-        VOLUME_MOUNTS+=(-v "/usr/lib/python3/dist-packages:/host/usr/lib/python3/dist-packages:ro")
-        echo "Mounting Python dist-packages from: /usr/lib/python3/dist-packages"
+    # Try to mount only the vpi package, not entire dist-packages
+    if [ -d "/usr/lib/python3/dist-packages/vpi" ]; then
+        VOLUME_MOUNTS+=(-v "/usr/lib/python3/dist-packages/vpi:/host/usr/lib/python3/dist-packages/vpi:ro")
+        echo "Mounting VPI package from: /usr/lib/python3/dist-packages/vpi"
+        VPI_MOUNTED=true
+    elif [ -f "/usr/lib/python3/dist-packages/vpi.py" ]; then
+        # VPI might be a single file module
+        VOLUME_MOUNTS+=(-v "/usr/lib/python3/dist-packages/vpi.py:/host/usr/lib/python3/dist-packages/vpi.py:ro")
+        echo "Mounting VPI module from: /usr/lib/python3/dist-packages/vpi.py"
         VPI_MOUNTED=true
     fi
 fi
 
-# Mount VPI shared libraries
+# Mount VPI shared libraries (needed for VPI to work)
 if [ -d "/usr/lib/aarch64-linux-gnu" ]; then
     # Check if VPI libraries exist
     if ls /usr/lib/aarch64-linux-gnu/libnvvpi* > /dev/null 2>&1; then
